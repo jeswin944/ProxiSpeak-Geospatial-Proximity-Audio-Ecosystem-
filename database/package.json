@@ -1,0 +1,23 @@
+{
+  "name": "database",
+  "version": "1.0.0",
+  "description": "ProxiSpeak MongoDB Database and Geospatial Engine",
+  "main": "index.js",
+  "scripts": {
+    "test-db": "node src/test-db.js",
+    "test": "node src/test-db.js"
+  },
+  "keywords": [
+    "proxispeak",
+    "mongodb",
+    "mongoose",
+    "geospatial"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.2.0"
+  }
+}
