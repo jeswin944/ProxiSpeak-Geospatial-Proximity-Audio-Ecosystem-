@@ -1,5 +1,5 @@
-import MultiplayerPreview from "./components/MultiplayerPreview";
+import RealtimeAvatarDemo from "./components/RealtimeAvatarDemo";
 
 export default function App() {
-  return <MultiplayerPreview />;
+  return <RealtimeAvatarDemo />;
 }
