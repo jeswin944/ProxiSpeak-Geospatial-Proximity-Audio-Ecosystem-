@@ -4,7 +4,9 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+
 const connectDB = require("./config/db");
+const registerSocketHandlers = require("./socket/socketHandlers");
 
 const app = express();
 app.use(cors());
@@ -18,7 +20,6 @@ const io = new Server(server, {
   }
 });
 
-const registerSocketHandlers = require("./socket/socketHandlers");
 registerSocketHandlers(io);
 
 app.get("/", (req, res) => {
@@ -35,7 +36,6 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Connect to MongoDB first, then start the HTTP server
 connectDB()
   .then(() => {
     server.listen(PORT, () => {

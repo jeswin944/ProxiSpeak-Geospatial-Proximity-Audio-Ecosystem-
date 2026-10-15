@@ -1,4 +1,3 @@
-Jeswin
 # ProxiSpeak — Geospatial Proximity Audio Ecosystem
 
 **ProxiSpeak** is a real-time virtual office ecosystem combining interactive 2D canvas navigation with geospatial proximity audio. Avatars move across a virtual office space, where spatial audio volume, stereo panning, and voice clarity dynamically adjust based on user distance and layout obstacles.
@@ -145,7 +144,7 @@ Expected output:
 ==================================================
 [MongoDB] Connecting to MongoDB...
 [MongoDB] Connected successfully to host: ...
-[MongoDB] Active Database: proxispeak
+[MongoDB] Active database: proxispeak
 ✅ Step 1: MongoDB is reachable and connected!
 📝 Step 2: Inserting sample Presence document...
 ✅ Document successfully inserted!
@@ -164,5 +163,3 @@ Expected output:
 2. **Member 2 (Frontend)**: Connect Canvas avatar coordinate listeners (`mousemove`/`wasd`) to backend socket emitters.
 3. **Member 3 (Spatial Audio)**: Consume coordinate streams to calculate euclidean distance $d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$ for Web Audio gain control.
 4. **Member 4 (Database)**: Implement seed layouts for `Office` with collision walls and meeting zones.
-=======
- main
