@@ -1,5 +1,4 @@
-
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { socket } from "../socket";
 import OfficeCanvas from "./OfficeCanvas";
 
@@ -19,65 +18,75 @@ const MOVEMENT_KEYS = [
   "arrowright",
 ];
 
-const INITIAL_POSITION = { x: 100, y: 100 };
-
-// Keep the same ID during this browser tab's session.
-// Different tabs receive different IDs for multiplayer testing.
-function getDemoUserId() {
-  const key = "proxispeak-demo-user-id";
-
-  let id = sessionStorage.getItem(key);
-
-  if (!id) {
-    id =
-      typeof crypto !== "undefined" &&
-      typeof crypto.randomUUID === "function"
-        ? `demo-${crypto.randomUUID()}`
-        : `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    sessionStorage.setItem(key, id);
-  }
-
-  return id;
-}
-
 export default function RealtimeAvatarDemo() {
-  const [userId] = useState(() => getDemoUserId());
+  const userId = "demo-user-1";
+  const officeId = "office-1";
 
-  // IMPORTANT: Must match the backend's valid office ID.
-  const officeId = "office_1";
-
-  const [position, setPosition] = useState(INITIAL_POSITION);
-  const positionRef = useRef(INITIAL_POSITION);
+  const [position, setPosition] = useState({
+    x: 100,
+    y: 100,
+  });
 
   const [connected, setConnected] = useState(false);
 
-  // Only real users received through local state or Socket.IO are shown.
+  // Temporary second avatar for testing the canvas.
+  // This is NOT a real connected user.
   const [users, setUsers] = useState([
     {
-      userId,
+      userId: "demo-user-1",
       name: "You",
-      ...INITIAL_POSITION,
+      x: 100,
+      y: 100,
+    },
+    {
+      userId: "demo-user-2",
+      name: "Demo User",
+      x: 300,
+      y: 200,
     },
   ]);
 
-  // Keep a current position reference for socket callbacks.
+  // Keep the current user's entry synchronized with movement.
   useEffect(() => {
-    positionRef.current = position;
-  }, [position]);
+    setUsers((previousUsers) => {
+      const exists = previousUsers.some(
+        (user) => user.userId === userId
+      );
 
-  // Socket.IO connection and real-time presence.
+      if (!exists) {
+        return [
+          ...previousUsers,
+          {
+            userId,
+            name: "You",
+            x: position.x,
+            y: position.y,
+          },
+        ];
+      }
+
+      return previousUsers.map((user) =>
+        user.userId === userId
+          ? {
+              ...user,
+              x: position.x,
+              y: position.y,
+            }
+          : user
+      );
+    });
+  }, [position.x, position.y, userId]);
+
+  // Socket.IO connection and presence events.
   useEffect(() => {
     function handleConnect() {
       setConnected(true);
 
-      const currentPosition = positionRef.current;
-
       socket.emit("user:join", {
         userId,
         officeId,
-        x: currentPosition.x,
-        y: currentPosition.y,
+        x: position.x,
+        y: position.y,
       });
     }
 
@@ -86,6 +95,9 @@ export default function RealtimeAvatarDemo() {
     }
 
     function handlePresenceUpdate(data) {
+      console.log("Presence update received:", data);
+
+      // Support either an array or an object containing users.
       const incomingUsers = Array.isArray(data)
         ? data
         : Array.isArray(data?.users)
@@ -97,40 +109,18 @@ export default function RealtimeAvatarDemo() {
           previousUsers.map((user) => [user.userId, user])
         );
 
-        for (const user of incomingUsers) {
+        incomingUsers.forEach((user) => {
           if (
-            !user ||
-            typeof user.userId !== "string" ||
-            !Number.isFinite(user.x) ||
-            !Number.isFinite(user.y)
+            user &&
+            typeof user.userId === "string" &&
+            Number.isFinite(user.x) &&
+            Number.isFinite(user.y)
           ) {
-            continue;
+            nextUsers.set(user.userId, {
+              ...nextUsers.get(user.userId),
+              ...user,
+            });
           }
-
-          // Ignore users belonging to another office, if provided.
-          if (user.officeId && user.officeId !== officeId) {
-            continue;
-          }
-
-          nextUsers.set(user.userId, {
-            ...nextUsers.get(user.userId),
-            ...user,
-            name:
-              user.userId === userId
-                ? "You"
-                : user.name || "Other User",
-          });
-        }
-
-        // Ensure the current user's local avatar remains visible.
-        const currentPosition = positionRef.current;
-
-        nextUsers.set(userId, {
-          ...nextUsers.get(userId),
-          userId,
-          name: "You",
-          x: currentPosition.x,
-          y: currentPosition.y,
         });
 
         return Array.from(nextUsers.values());
@@ -141,12 +131,12 @@ export default function RealtimeAvatarDemo() {
       const leftUserId =
         typeof data === "string" ? data : data?.userId;
 
-      if (!leftUserId || leftUserId === userId) {
-        return;
-      }
+      if (!leftUserId) return;
 
       setUsers((previousUsers) =>
-        previousUsers.filter((user) => user.userId !== leftUserId)
+        previousUsers.filter(
+          (user) => user.userId !== leftUserId
+        )
       );
     }
 
@@ -164,22 +154,20 @@ export default function RealtimeAvatarDemo() {
       socket.off("user:left", handleUserLeft);
       socket.disconnect();
     };
-  }, [userId, officeId]);
+  }, []);
 
-  // Smooth movement, including simultaneous WASD/arrow-key presses.
+  // Smooth movement with simultaneous keyboard presses.
   useEffect(() => {
     const keysPressed = new Set();
 
     let animationFrameId;
     let previousTime = 0;
-    let lastSentPosition = { ...INITIAL_POSITION };
+    let lastSentPosition = { x: 100, y: 100 };
 
     function handleKeyDown(event) {
       const key = event.key.toLowerCase();
 
-      if (!MOVEMENT_KEYS.includes(key)) {
-        return;
-      }
+      if (!MOVEMENT_KEYS.includes(key)) return;
 
       event.preventDefault();
       keysPressed.add(key);
@@ -198,7 +186,11 @@ export default function RealtimeAvatarDemo() {
         previousTime = time;
       }
 
-      const deltaTime = Math.min((time - previousTime) / 1000, 0.05);
+      const deltaTime = Math.min(
+        (time - previousTime) / 1000,
+        0.05
+      );
+
       previousTime = time;
 
       let dx = 0;
@@ -221,57 +213,52 @@ export default function RealtimeAvatarDemo() {
       }
 
       if (dx !== 0 || dy !== 0) {
-        // Normalize diagonal movement so it is not faster.
-        const length = Math.hypot(dx, dy);
+        const length = Math.sqrt(dx * dx + dy * dy);
+
         dx /= length;
         dy /= length;
 
-        const current = positionRef.current;
+        const movementX = dx * MOVEMENT_SPEED * deltaTime;
+        const movementY = dy * MOVEMENT_SPEED * deltaTime;
 
-        const next = {
-          x: Math.max(
-            0,
-            Math.min(
-              OFFICE_WIDTH - AVATAR_SIZE,
-              current.x + dx * MOVEMENT_SPEED * deltaTime
-            )
-          ),
-          y: Math.max(
-            0,
-            Math.min(
-              OFFICE_HEIGHT - AVATAR_SIZE,
-              current.y + dy * MOVEMENT_SPEED * deltaTime
-            )
-          ),
-        };
+        setPosition((current) => {
+          const next = {
+            x: Math.max(
+              0,
+              Math.min(
+                OFFICE_WIDTH - AVATAR_SIZE,
+                current.x + movementX
+              )
+            ),
+            y: Math.max(
+              0,
+              Math.min(
+                OFFICE_HEIGHT - AVATAR_SIZE,
+                current.y + movementY
+              )
+            ),
+          };
 
-        positionRef.current = next;
-        setPosition(next);
+          if (
+            socket.connected &&
+            (Math.abs(next.x - lastSentPosition.x) >= 2 ||
+              Math.abs(next.y - lastSentPosition.y) >= 2)
+          ) {
+            socket.emit("avatar:move", {
+              userId,
+              officeId,
+              x: next.x,
+              y: next.y,
+            });
 
-        // Update the current avatar immediately in the canvas.
-        setUsers((previousUsers) =>
-          previousUsers.map((user) =>
-            user.userId === userId
-              ? { ...user, x: next.x, y: next.y }
-              : user
-          )
-        );
+            lastSentPosition = {
+              x: next.x,
+              y: next.y,
+            };
+          }
 
-        // Send movement to the server only when connected.
-        if (
-          socket.connected &&
-          (Math.abs(next.x - lastSentPosition.x) >= 2 ||
-            Math.abs(next.y - lastSentPosition.y) >= 2)
-        ) {
-          socket.emit("avatar:move", {
-            userId,
-            officeId,
-            x: next.x,
-            y: next.y,
-          });
-
-          lastSentPosition = { ...next };
-        }
+          return next;
+        });
       }
 
       animationFrameId = requestAnimationFrame(updatePosition);
@@ -287,9 +274,10 @@ export default function RealtimeAvatarDemo() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
+
       cancelAnimationFrame(animationFrameId);
     };
-  }, [userId, officeId]);
+  }, []);
 
   return (
     <main
@@ -298,7 +286,7 @@ export default function RealtimeAvatarDemo() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1>ProxiSpeak — Avatar Movement</h1>
+      <h1>ProxiSpeak â€” Avatar Movement</h1>
 
       <p>
         Socket status:{" "}
@@ -312,7 +300,10 @@ export default function RealtimeAvatarDemo() {
         to move diagonally.
       </p>
 
-      <OfficeCanvas users={users} currentUserId={userId} />
+      <OfficeCanvas
+        users={users}
+        currentUserId={userId}
+      />
 
       <p>
         Position: X = {Math.round(position.x)}, Y ={" "}
@@ -322,8 +313,7 @@ export default function RealtimeAvatarDemo() {
       {!connected && (
         <p>
           Local movement is available. Real multiplayer requires
-          the backend server to be running and accepting Socket.IO
-          connections.
+          the backend and matching Socket.IO events.
         </p>
       )}
     </main>
