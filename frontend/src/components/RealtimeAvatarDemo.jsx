@@ -1,5 +1,7 @@
+
 import { useEffect, useState } from "react";
 import { socket } from "../socket";
+import OfficeCanvas from "./OfficeCanvas";
 
 const OFFICE_WIDTH = 800;
 const OFFICE_HEIGHT = 500;
@@ -18,13 +20,63 @@ const MOVEMENT_KEYS = [
 ];
 
 export default function RealtimeAvatarDemo() {
-  const [position, setPosition] = useState({ x: 100, y: 100 });
-  const [connected, setConnected] = useState(false);
-
-  // Temporary identity for frontend testing.
-  // Replace with the authenticated user's ID later.
   const userId = "demo-user-1";
   const officeId = "office-1";
+
+  const [position, setPosition] = useState({
+    x: 100,
+    y: 100,
+  });
+
+  const [connected, setConnected] = useState(false);
+
+  // Temporary second avatar for testing the canvas.
+  // This is NOT a real connected user.
+  const [users, setUsers] = useState([
+    {
+      userId: "demo-user-1",
+      name: "You",
+      x: 100,
+      y: 100,
+    },
+    {
+      userId: "demo-user-2",
+      name: "Demo User",
+      x: 300,
+      y: 200,
+    },
+  ]);
+
+  // Keep the current user's entry synchronized with movement.
+  useEffect(() => {
+    setUsers((previousUsers) => {
+      const exists = previousUsers.some(
+        (user) => user.userId === userId
+      );
+
+      if (!exists) {
+        return [
+          ...previousUsers,
+          {
+            userId,
+            name: "You",
+            x: position.x,
+            y: position.y,
+          },
+        ];
+      }
+
+      return previousUsers.map((user) =>
+        user.userId === userId
+          ? {
+              ...user,
+              x: position.x,
+              y: position.y,
+            }
+          : user
+      );
+    });
+  }, [position.x, position.y, userId]);
 
   // Socket.IO connection and presence events.
   useEffect(() => {
@@ -45,11 +97,54 @@ export default function RealtimeAvatarDemo() {
 
     function handlePresenceUpdate(data) {
       console.log("Presence update received:", data);
+
+      // Support either an array or an object containing users.
+      const incomingUsers = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.users)
+          ? data.users
+          : [];
+
+      setUsers((previousUsers) => {
+        const nextUsers = new Map(
+          previousUsers.map((user) => [user.userId, user])
+        );
+
+        incomingUsers.forEach((user) => {
+          if (
+            user &&
+            typeof user.userId === "string" &&
+            Number.isFinite(user.x) &&
+            Number.isFinite(user.y)
+          ) {
+            nextUsers.set(user.userId, {
+              ...nextUsers.get(user.userId),
+              ...user,
+            });
+          }
+        });
+
+        return Array.from(nextUsers.values());
+      });
+    }
+
+    function handleUserLeft(data) {
+      const leftUserId =
+        typeof data === "string" ? data : data?.userId;
+
+      if (!leftUserId) return;
+
+      setUsers((previousUsers) =>
+        previousUsers.filter(
+          (user) => user.userId !== leftUserId
+        )
+      );
     }
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("presence:update", handlePresenceUpdate);
+    socket.on("user:left", handleUserLeft);
 
     socket.connect();
 
@@ -57,11 +152,12 @@ export default function RealtimeAvatarDemo() {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("presence:update", handlePresenceUpdate);
+      socket.off("user:left", handleUserLeft);
       socket.disconnect();
     };
   }, []);
 
-  // Support simultaneous keyboard presses and smooth movement.
+  // Smooth movement with simultaneous keyboard presses.
   useEffect(() => {
     const keysPressed = new Set();
 
@@ -91,7 +187,11 @@ export default function RealtimeAvatarDemo() {
         previousTime = time;
       }
 
-      const deltaTime = Math.min((time - previousTime) / 1000, 0.05);
+      const deltaTime = Math.min(
+        (time - previousTime) / 1000,
+        0.05
+      );
+
       previousTime = time;
 
       let dx = 0;
@@ -114,7 +214,6 @@ export default function RealtimeAvatarDemo() {
       }
 
       if (dx !== 0 || dy !== 0) {
-        // Normalize diagonal movement so it is not faster.
         const length = Math.sqrt(dx * dx + dy * dy);
 
         dx /= length;
@@ -141,7 +240,6 @@ export default function RealtimeAvatarDemo() {
             ),
           };
 
-          // Emit only when the position changes.
           if (
             socket.connected &&
             (Math.abs(next.x - lastSentPosition.x) >= 2 ||
@@ -154,7 +252,10 @@ export default function RealtimeAvatarDemo() {
               y: next.y,
             });
 
-            lastSentPosition = { x: next.x, y: next.y };
+            lastSentPosition = {
+              x: next.x,
+              y: next.y,
+            };
           }
 
           return next;
@@ -200,36 +301,10 @@ export default function RealtimeAvatarDemo() {
         to move diagonally.
       </p>
 
-      <div
-        style={{
-          position: "relative",
-          width: "min(800px, 100%)",
-          aspectRatio: "8 / 5",
-          border: "2px solid #64748b",
-          borderRadius: 12,
-          backgroundColor: "#f1f5f9",
-          backgroundImage:
-            "linear-gradient(#dbe3ed 1px, transparent 1px), linear-gradient(90deg, #dbe3ed 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            left: `${(position.x / OFFICE_WIDTH) * 100}%`,
-            top: `${(position.y / OFFICE_HEIGHT) * 100}%`,
-            width: `${(AVATAR_SIZE / OFFICE_WIDTH) * 100}%`,
-            aspectRatio: "1",
-            borderRadius: "50%",
-            backgroundColor: "#2563eb",
-            border: "2px solid white",
-            boxSizing: "border-box",
-            boxShadow: "0 2px 8px rgba(37, 99, 235, 0.4)",
-          }}
-          title="Your avatar"
-        />
-      </div>
+      <OfficeCanvas
+        users={users}
+        currentUserId={userId}
+      />
 
       <p>
         Position: X = {Math.round(position.x)}, Y ={" "}
@@ -238,8 +313,8 @@ export default function RealtimeAvatarDemo() {
 
       {!connected && (
         <p>
-          Local movement is available. Multiplayer requires the
-          backend to be running and the Socket.IO events to match.
+          Local movement is available. Real multiplayer requires
+          the backend and matching Socket.IO events.
         </p>
       )}
     </main>
