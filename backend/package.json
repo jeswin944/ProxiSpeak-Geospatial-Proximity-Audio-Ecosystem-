@@ -7,9 +7,15 @@
                     "start":  "node src/server.js",
                     "dev":  "nodemon src/server.js",
                     "test":  "node src/test-db.js",
+                    "test-db":  "node src/test-db.js",
                     "test-integration":  "node src/test-integration.js",
-                    "test-db":  "node src/test-db.js"
+                    "test-e2e":  "node src/test-e2e-sync.js"
                 },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "ISC",
     "dependencies":  {
                          "cors":  "^2.8.6",
                          "dotenv":  "^16.4.5",

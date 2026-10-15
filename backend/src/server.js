@@ -4,7 +4,6 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
-
 const connectDB = require("./config/db");
 const registerSocketHandlers = require("./socket/socketHandlers");
 
@@ -36,6 +35,7 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 
+// Connect to MongoDB before starting the HTTP server
 connectDB()
   .then(() => {
     server.listen(PORT, () => {

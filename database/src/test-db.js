@@ -1,5 +1,5 @@
-const { connectDB, disconnectDB } = require("./db");
-const { Presence } = require("./models");
+﻿const { connectDB, disconnectDB } = require("./db");
+const { Presence, Office } = require("./models");
 
 async function runTest() {
   console.log("==================================================");
@@ -7,9 +7,17 @@ async function runTest() {
   console.log("==================================================");
 
   try {
+    // Task 1.1: Verify backend/database connects to MongoDB Atlas
     await connectDB();
-    console.log("✅ Step 1: MongoDB is reachable and connected!\n");
+    console.log("✅ Step 1: MongoDB Atlas is reachable and connected!\n");
 
+    // Task 1.2: Check office dimensions and coordinate formats match frontend
+    // Frontend standard: width: 800, height: 500
+    const FRONTEND_WIDTH = 800;
+    const FRONTEND_HEIGHT = 500;
+    console.log(`Checking office coordinate bounds against frontend: 0..${FRONTEND_WIDTH} x 0..${FRONTEND_HEIGHT}`);
+
+    // Task 1.3: Test inserting and reading a presence document
     const testOfficeId = "office-main";
     const testUserId = `user-test-${Date.now()}`;
     const samplePresenceData = {
@@ -21,13 +29,11 @@ async function runTest() {
       lastSeen: new Date()
     };
 
-    console.log("📝 Step 2: Inserting sample Presence document...");
-    console.log(JSON.stringify(samplePresenceData, null, 2));
-
+    console.log("Step 2: Inserting sample Presence document...");
     const insertedPresence = await Presence.create(samplePresenceData);
     console.log(`✅ Document successfully inserted! (ID: ${insertedPresence._id})\n`);
 
-    console.log("🔍 Step 3: Querying the document back from MongoDB...");
+    console.log("Step 3: Querying the document back from MongoDB...");
     const retrievedPresence = await Presence.findOne({
       userId: testUserId,
       officeId: testOfficeId
@@ -48,7 +54,31 @@ async function runTest() {
       lastSeen: retrievedPresence.lastSeen
     });
 
-    console.log("\n🧹 Step 4: Cleaning up test document...");
+    // Task 1.4: Verify that invalid coordinates are rejected
+    console.log("\nStep 4: Verifying schema rejects invalid coordinates...");
+    const invalidCoords = [
+      { name: "Negative X (-10)", doc: { userId: "u1", officeId: "o1", x: -10, y: 100 } },
+      { name: "Out-of-bounds X (950 > 800)", doc: { userId: "u2", officeId: "o1", x: 950, y: 100 } },
+      { name: "Negative Y (-5)", doc: { userId: "u3", officeId: "o1", x: 100, y: -5 } },
+      { name: "Out-of-bounds Y (600 > 500)", doc: { userId: "u4", officeId: "o1", x: 100, y: 600 } },
+    ];
+
+    for (const testCase of invalidCoords) {
+      let rejected = false;
+      try {
+        const doc = new Presence(testCase.doc);
+        await doc.validate();
+      } catch (err) {
+        rejected = true;
+      }
+      if (!rejected) {
+        throw new Error(`Schema failed to reject invalid coordinates: ${testCase.name}`);
+      }
+      console.log(`   ✓ Correctly rejected: ${testCase.name}`);
+    }
+    console.log("✅ All invalid coordinate tests rejected by schema validation.");
+
+    console.log("\nStep 5: Cleaning up test document...");
     await Presence.deleteOne({ _id: retrievedPresence._id });
     console.log("✅ Cleanup complete.");
 
@@ -56,12 +86,7 @@ async function runTest() {
   } catch (error) {
     console.error("\n❌ Database test encountered an issue:");
     console.error(error.message);
-    console.log("\n💡 TROUBLESHOOTING TIPS:");
-    console.log("1. Ensure your MongoDB Atlas cluster or local MongoDB instance is active.");
-    console.log("2. Check database/.env and verify MONGODB_URI:");
-    console.log("   - In MongoDB Atlas: Go to Database Access -> Add User (readWriteAnyDatabase).");
-    console.log("   - In Network Access -> Add IP Address (add 0.0.0.0/0 or your current IP).");
-    console.log("   - Replace <username> and <password> in your connection string.");
+    process.exitCode = 1;
   } finally {
     await disconnectDB();
     console.log("==================================================");
