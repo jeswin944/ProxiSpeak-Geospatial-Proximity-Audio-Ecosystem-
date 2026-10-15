@@ -1,3 +1,5 @@
+﻿const mongoose = require("mongoose");
+const Presence = require("../models/Presence");
 
 function registerSocketHandlers(io) {
   const users = new Map();
@@ -6,16 +8,15 @@ function registerSocketHandlers(io) {
   const validOffices = new Set(["office_1", "office_2"]);
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
+    console.log("[Socket] User connected:", socket.id);
 
     socket.on("user:join", (data) => {
-      const { userId, officeId } = data || {};
+      const { userId, officeId, x = 0, y = 0 } = data || {};
 
       if (
         typeof userId !== "string" ||
         !userId.trim() ||
-        typeof officeId !== "string" ||
-        !validOffices.has(officeId)
+        !isValidOfficeId(officeId)
       ) {
         console.warn("Rejected user:join:", socket.id);
         return;
@@ -58,6 +59,18 @@ function registerSocketHandlers(io) {
 
       // Notify other users in this office
       socket.to(officeId).emit("presence:update", [user]);
+
+      // Persistence strategy (Week 1): Save to MongoDB asynchronously if connected
+      // Non-blocking: will never hold up real-time websocket delivery
+      if (mongoose.connection.readyState === 1) {
+        Presence.findOneAndUpdate(
+          { userId, officeId },
+          { userId, officeId, x: initialX, y: initialY, isOnline: true, lastSeen: new Date() },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        ).catch((err) => {
+          console.error("[MongoDB] Non-blocking join persistence log:", err.message);
+        });
+      }
     });
 
     socket.on("avatar:move", (data) => {
@@ -89,12 +102,12 @@ function registerSocketHandlers(io) {
       }
 
       const existingUser = users.get(userId);
-
       if (!existingUser || existingUser.officeId !== officeId) {
         console.warn("Unknown active user:", socket.id);
         return;
       }
 
+      // In-memory update for fast 60fps real-time broadcast (Zero DB write per movement tick)
       const user = { userId, officeId, x, y };
       users.set(userId, user);
 
@@ -114,7 +127,7 @@ function registerSocketHandlers(io) {
         }
       }
 
-      console.log("User disconnected:", socket.id);
+      console.log("[Socket] User disconnected:", socket.id);
     });
   });
 }
