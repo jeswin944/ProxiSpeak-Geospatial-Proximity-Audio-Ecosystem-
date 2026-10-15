@@ -1,11 +1,11 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import { socket } from "../socket";
 import OfficeCanvas from "./OfficeCanvas";
 
 const OFFICE_WIDTH = 800;
 const OFFICE_HEIGHT = 500;
 const AVATAR_SIZE = 24;
-const MOVEMENT_SPEED = 180;
+const MOVEMENT_SPEED = 200;
 
 const MOVEMENT_KEYS = [
   "w",
@@ -19,74 +19,37 @@ const MOVEMENT_KEYS = [
 ];
 
 export default function RealtimeAvatarDemo() {
-  const userId = "demo-user-1";
-  const officeId = "office-1";
+  // Generate or retrieve a persistent session userId for this browser tab
+  const [userId] = useState(() => {
+    let stored = sessionStorage.getItem("proxispeak_uid");
+    if (!stored) {
+      stored = `user_${Math.floor(100 + Math.random() * 900)}`;
+      sessionStorage.setItem("proxispeak_uid", stored);
+    }
+    return stored;
+  });
+
+  const officeId = "office_1";
 
   const [position, setPosition] = useState({
-    x: 100,
-    y: 100,
+    x: 100 + Math.floor(Math.random() * 200),
+    y: 100 + Math.floor(Math.random() * 150),
   });
 
   const [connected, setConnected] = useState(false);
+  const [users, setUsers] = useState([]);
+  const positionRef = useRef(position);
+  positionRef.current = position;
 
-  // Temporary second avatar for testing the canvas.
-  // This is NOT a real connected user.
-  const [users, setUsers] = useState([
-    {
-      userId: "demo-user-1",
-      name: "You",
-      x: 100,
-      y: 100,
-    },
-    {
-      userId: "demo-user-2",
-      name: "Demo User",
-      x: 300,
-      y: 200,
-    },
-  ]);
-
-  // Keep the current user's entry synchronized with movement.
-  useEffect(() => {
-    setUsers((previousUsers) => {
-      const exists = previousUsers.some(
-        (user) => user.userId === userId
-      );
-
-      if (!exists) {
-        return [
-          ...previousUsers,
-          {
-            userId,
-            name: "You",
-            x: position.x,
-            y: position.y,
-          },
-        ];
-      }
-
-      return previousUsers.map((user) =>
-        user.userId === userId
-          ? {
-              ...user,
-              x: position.x,
-              y: position.y,
-            }
-          : user
-      );
-    });
-  }, [position.x, position.y, userId]);
-
-  // Socket.IO connection and presence events.
+  // Socket.IO connection and presence synchronization
   useEffect(() => {
     function handleConnect() {
       setConnected(true);
-
       socket.emit("user:join", {
         userId,
         officeId,
-        x: position.x,
-        y: position.y,
+        x: positionRef.current.x,
+        y: positionRef.current.y,
       });
     }
 
@@ -95,49 +58,34 @@ export default function RealtimeAvatarDemo() {
     }
 
     function handlePresenceUpdate(data) {
-      console.log("Presence update received:", data);
-
-      // Support either an array or an object containing users.
       const incomingUsers = Array.isArray(data)
         ? data
         : Array.isArray(data?.users)
           ? data.users
           : [];
 
-      setUsers((previousUsers) => {
-        const nextUsers = new Map(
-          previousUsers.map((user) => [user.userId, user])
-        );
+      setUsers((prevUsers) => {
+        const userMap = new Map(prevUsers.map((u) => [u.userId, u]));
 
-        incomingUsers.forEach((user) => {
-          if (
-            user &&
-            typeof user.userId === "string" &&
-            Number.isFinite(user.x) &&
-            Number.isFinite(user.y)
-          ) {
-            nextUsers.set(user.userId, {
-              ...nextUsers.get(user.userId),
-              ...user,
+        incomingUsers.forEach((u) => {
+          if (u && typeof u.userId === "string" && Number.isFinite(u.x) && Number.isFinite(u.y)) {
+            userMap.set(u.userId, {
+              ...userMap.get(u.userId),
+              ...u,
+              name: u.userId === userId ? "You" : u.userId,
             });
           }
         });
 
-        return Array.from(nextUsers.values());
+        return Array.from(userMap.values());
       });
     }
 
     function handleUserLeft(data) {
-      const leftUserId =
-        typeof data === "string" ? data : data?.userId;
-
+      const leftUserId = typeof data === "string" ? data : data?.userId;
       if (!leftUserId) return;
 
-      setUsers((previousUsers) =>
-        previousUsers.filter(
-          (user) => user.userId !== leftUserId
-        )
-      );
+      setUsers((prevUsers) => prevUsers.filter((u) => u.userId !== leftUserId));
     }
 
     socket.on("connect", handleConnect);
@@ -154,168 +102,182 @@ export default function RealtimeAvatarDemo() {
       socket.off("user:left", handleUserLeft);
       socket.disconnect();
     };
-  }, []);
+  }, [userId, officeId]);
 
-  // Smooth movement with simultaneous keyboard presses.
+  // Keep own avatar in users list synchronized with local movement
+  useEffect(() => {
+    setUsers((prevUsers) => {
+      const exists = prevUsers.some((u) => u.userId === userId);
+      if (!exists) {
+        return [
+          ...prevUsers,
+          { userId, name: "You", x: position.x, y: position.y },
+        ];
+      }
+      return prevUsers.map((u) =>
+        u.userId === userId ? { ...u, x: position.x, y: position.y } : u
+      );
+    });
+  }, [position, userId]);
+
+  // Smooth continuous keyboard movement with diagonal normalization
   useEffect(() => {
     const keysPressed = new Set();
+    let animFrameId;
+    let prevTime = 0;
+    let lastSent = { x: position.x, y: position.y };
 
-    let animationFrameId;
-    let previousTime = 0;
-    let lastSentPosition = { x: 100, y: 100 };
-
-    function handleKeyDown(event) {
-      const key = event.key.toLowerCase();
-
+    function handleKeyDown(e) {
+      const key = e.key.toLowerCase();
       if (!MOVEMENT_KEYS.includes(key)) return;
-
-      event.preventDefault();
+      e.preventDefault();
       keysPressed.add(key);
     }
 
-    function handleKeyUp(event) {
-      keysPressed.delete(event.key.toLowerCase());
+    function handleKeyUp(e) {
+      keysPressed.delete(e.key.toLowerCase());
     }
 
-    function handleWindowBlur() {
+    function handleBlur() {
       keysPressed.clear();
     }
 
-    function updatePosition(time) {
-      if (previousTime === 0) {
-        previousTime = time;
-      }
-
-      const deltaTime = Math.min(
-        (time - previousTime) / 1000,
-        0.05
-      );
-
-      previousTime = time;
+    function loop(time) {
+      if (prevTime === 0) prevTime = time;
+      const delta = Math.min((time - prevTime) / 1000, 0.05);
+      prevTime = time;
 
       let dx = 0;
       let dy = 0;
 
-      if (keysPressed.has("w") || keysPressed.has("arrowup")) {
-        dy -= 1;
-      }
-
-      if (keysPressed.has("s") || keysPressed.has("arrowdown")) {
-        dy += 1;
-      }
-
-      if (keysPressed.has("a") || keysPressed.has("arrowleft")) {
-        dx -= 1;
-      }
-
-      if (keysPressed.has("d") || keysPressed.has("arrowright")) {
-        dx += 1;
-      }
+      if (keysPressed.has("w") || keysPressed.has("arrowup")) dy -= 1;
+      if (keysPressed.has("s") || keysPressed.has("arrowdown")) dy += 1;
+      if (keysPressed.has("a") || keysPressed.has("arrowleft")) dx -= 1;
+      if (keysPressed.has("d") || keysPressed.has("arrowright")) dx += 1;
 
       if (dx !== 0 || dy !== 0) {
-        const length = Math.sqrt(dx * dx + dy * dy);
+        const len = Math.sqrt(dx * dx + dy * dy);
+        dx /= len;
+        dy /= len;
 
-        dx /= length;
-        dy /= length;
+        const moveX = dx * MOVEMENT_SPEED * delta;
+        const moveY = dy * MOVEMENT_SPEED * delta;
 
-        const movementX = dx * MOVEMENT_SPEED * deltaTime;
-        const movementY = dy * MOVEMENT_SPEED * deltaTime;
-
-        setPosition((current) => {
+        setPosition((curr) => {
           const next = {
-            x: Math.max(
-              0,
-              Math.min(
-                OFFICE_WIDTH - AVATAR_SIZE,
-                current.x + movementX
-              )
-            ),
-            y: Math.max(
-              0,
-              Math.min(
-                OFFICE_HEIGHT - AVATAR_SIZE,
-                current.y + movementY
-              )
-            ),
+            x: Math.max(0, Math.min(OFFICE_WIDTH - AVATAR_SIZE, curr.x + moveX)),
+            y: Math.max(0, Math.min(OFFICE_HEIGHT - AVATAR_SIZE, curr.y + moveY)),
           };
 
           if (
             socket.connected &&
-            (Math.abs(next.x - lastSentPosition.x) >= 2 ||
-              Math.abs(next.y - lastSentPosition.y) >= 2)
+            (Math.abs(next.x - lastSent.x) >= 2 || Math.abs(next.y - lastSent.y) >= 2)
           ) {
             socket.emit("avatar:move", {
               userId,
               officeId,
-              x: next.x,
-              y: next.y,
+              x: Math.round(next.x),
+              y: Math.round(next.y),
             });
-
-            lastSentPosition = {
-              x: next.x,
-              y: next.y,
-            };
+            lastSent = { x: next.x, y: next.y };
           }
 
           return next;
         });
       }
 
-      animationFrameId = requestAnimationFrame(updatePosition);
+      animFrameId = requestAnimationFrame(loop);
     }
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("blur", handleBlur);
 
-    animationFrameId = requestAnimationFrame(updatePosition);
+    animFrameId = requestAnimationFrame(loop);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleWindowBlur);
-
-      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("blur", handleBlur);
+      cancelAnimationFrame(animFrameId);
     };
-  }, []);
+  }, [userId, officeId]);
 
   return (
     <main
       style={{
         padding: 24,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        maxWidth: 900,
+        margin: "0 auto",
+        color: "#f1f5f9",
+        background: "#0b0f19",
+        minHeight: "100vh",
       }}
     >
-      <h1>ProxiSpeak â€” Avatar Movement</h1>
-
-      <p>
-        Socket status:{" "}
-        <strong>
-          {connected ? "Connected" : "Disconnected"}
-        </strong>
-      </p>
-
-      <p>
-        Use W, A, S, D or the arrow keys. Hold two keys together
-        to move diagonally.
-      </p>
-
-      <OfficeCanvas
-        users={users}
-        currentUserId={userId}
-      />
-
-      <p>
-        Position: X = {Math.round(position.x)}, Y ={" "}
-        {Math.round(position.y)}
-      </p>
-
-      {!connected && (
-        <p>
-          Local movement is available. Real multiplayer requires
-          the backend and matching Socket.IO events.
+      <header style={{ marginBottom: 16 }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#38bdf8" }}>
+          ProxiSpeak — Geospatial Office Multiplayer
+        </h1>
+        <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 13 }}>
+          Real-time movement broadcast with MongoDB Atlas geospatial persistence.
         </p>
-      )}
+      </header>
+
+      {/* Status Bar */}
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          alignItems: "center",
+          background: "#1e293b",
+          padding: "10px 16px",
+          borderRadius: 8,
+          marginBottom: 16,
+          fontSize: 13,
+          border: "1px solid #334155",
+        }}
+      >
+        <div>
+          Status:{" "}
+          <strong style={{ color: connected ? "#4ade80" : "#f87171" }}>
+            {connected ? "● Connected to Atlas" : "○ Disconnected"}
+          </strong>
+        </div>
+        <div>
+          Office: <strong style={{ color: "#e2e8f0" }}>{officeId}</strong>
+        </div>
+        <div>
+          Your User ID: <strong style={{ color: "#38bdf8" }}>{userId}</strong>
+        </div>
+        <div>
+          Users in Office: <strong style={{ color: "#a78bfa" }}>{users.length}</strong>
+        </div>
+        <div>
+          Coords:{" "}
+          <strong style={{ color: "#fbbf24" }}>
+            ({Math.round(position.x)}, {Math.round(position.y)})
+          </strong>
+        </div>
+      </div>
+
+      {/* Office Canvas */}
+      <OfficeCanvas users={users} currentUserId={userId} />
+
+      {/* Controls & Instructions */}
+      <div
+        style={{
+          marginTop: 16,
+          padding: 12,
+          background: "#1e293b",
+          borderRadius: 8,
+          fontSize: 13,
+          color: "#94a3b8",
+          border: "1px solid #334155",
+        }}
+      >
+        <strong style={{ color: "#e2e8f0" }}>Controls:</strong> Hold <kbd>W</kbd>, <kbd>A</kbd>, <kbd>S</kbd>, <kbd>D</kbd> or the Arrow keys to move. Open this page in a second browser window to see multiplayer avatars move together in real-time.
+      </div>
     </main>
   );
 }

@@ -3,121 +3,156 @@
 **Role:** Member 4 — MongoDB Atlas, Schemas & Integration Testing  
 **Project:** ProxiSpeak — Geospatial Proximity Audio Ecosystem  
 **Date:** October 15, 2026  
-**Status:** ✅ Completed & Verified  
+**Status:** ✅ Fully Verified & Documented (All Tests Passing)  
 
 ---
 
 ## 1. Executive Summary
 
-All Day 3 deliverables have been implemented, tested, and verified:
-1. **MongoDB Atlas Connection Verified**: Live cluster connection established using environment variables with timeout handling and automatic reconnection.
-2. **Schemas Completed & Enforced**: `Presence`, `Office` (Office Layout with obstacles), and `User` Mongoose models with strict boundary validation (0–800 X, 0–500 Y).
-3. **Database Operations Tested**: Unit tests verify insertion, retrieval, coordinate checks, and rejection of invalid data.
-4. **Integration Testing Completed**: All 5 scenarios executed and passed with Socket.IO test clients.
-5. **Member 1 Coordination on Persistence Strategy**: Aligned on in-memory state for low-latency live position broadcasting, with asynchronous MongoDB persistence for join/leave events.
+All Day 3 deliverables, schema validations, and integration tests have been completed and verified across both backend and database packages:
+- **MongoDB Atlas Connection**: Confirmed live connection to cluster `ac-6nq1jw8-shard-00-01.w15le4t.mongodb.net` (`proxispeak` database) with `.env` credential management and timeout protection.
+- **Office & Coordinate Alignment**: Verified that office dimensions (800×500) and coordinate ranges (`0 <= x <= 800`, `0 <= y <= 500`) exactly match the frontend canvas specifications.
+- **Schemas Enforced**: Verified `Presence` schema (with `userId`, `officeId`, `x`, `y`, `isOnline`, `lastSeen`) and `Office` schema (with office dimensions and obstacle definitions: walls, desks, meeting rooms).
+- **Integration Test Plan**: Executed all 6 test scenarios with automated headless Socket.IO clients; all 6 passed cleanly.
+- **Bug Fixes & Retesting**: All identified syntax errors, missing components, reference errors, and dependency gaps resolved and verified.
 
 ---
 
-## 2. Task 1: MongoDB Connection & Configuration
+## 2. Task 1 & 2: Database Operations & Schema Verification
 
-- **Atlas Cluster**: Connected to MongoDB Atlas cluster `ac-6nq1jw8-shard-00-01.w15le4t.mongodb.net`.
-- **Active Database**: `proxispeak`.
-- **Environment Configuration**: Loaded from `backend/.env` using `dotenv.config()`.
-  - Credentials: `MONGODB_URI=mongodb+srv://...` (excluded from git via `.gitignore`).
-- **Connection Error & Timeout Handling**:
-  - `serverSelectionTimeoutMS: 5000` configured in `backend/src/config/db.js`.
-  - Try/catch wraps connection; failures report informative diagnostics without crashing unexpectedly.
-  - Presence updates in socket handlers verify `mongoose.connection.readyState === 1` before persisting, guaranteeing zero blocking on the WebSocket event loop.
+### Presence Schema Fields
+- `userId` (String, required, indexed)
+- `officeId` (String, required, indexed)
+- `x` (Number, required, `min: 0`, `max: 800`)
+- `y` (Number, required, `min: 0`, `max: 500`)
+- `isOnline` (Boolean, default: `true`)
+- `lastSeen` (Date, default: `Date.now`)
+- Compound unique index: `{ officeId: 1, userId: 1 }`
+
+### Office Layout Schema Fields
+- `officeId` (String, required, unique)
+- `name` (String, required)
+- `width` (Number, default: `800`)
+- `height` (Number, default: `500`)
+- `obstacles` (Array of obstacle sub-documents: `{ obstacleId, type, label, x, y, width, height }`)
 
 ---
 
-## 3. Task 2: Schema Models & Office Layout Documentation
+## 3. Task 3: Integration Test Matrix
 
-### Presence Schema (`backend/src/models/Presence.js`)
-| Field | Type | Required | Constraints / Default | Description |
+| # | Test Case | Expected Result | Actual Result | Status |
 |---|---|---|---|---|
-| `userId` | String | Yes | Unique per office | Unique identifier for the user |
-| `officeId` | String | Yes | Indexed | Target office space |
-| `x` | Number | Yes | `min: 0, max: 800` | X-coordinate on office canvas |
-| `y` | Number | Yes | `min: 0, max: 500` | Y-coordinate on office canvas |
-| `isOnline` | Boolean | No | Default: `true` | Real-time connectivity state |
-| `lastSeen` | Date | No | Default: `Date.now` | Timestamp of last activity |
+| **1** | Two users join the same office | Both appear | Both appear in `presence:update` lists on each client | **PASS** ✅ |
+| **2** | A user moves | Other clients receive the new position | Client B received updated position `(320, 240)` from User A | **PASS** ✅ |
+| **3** | Multiple users move together | Each avatar remains independent | Independent positions preserved: User A = `(150, 120)`, User B = `(450, 380)` | **PASS** ✅ |
+| **4** | A user disconnects | Their avatar disappears | Client A received `user:left` event for `user_B` and removed avatar | **PASS** ✅ |
+| **5** | Invalid coordinates are sent | Server rejects them | Server caught invalid coordinates `(1200, -90)` and emitted `error:invalid_coordinates` | **PASS** ✅ |
+| **6** | Database connection fails | Backend reports the failure | Backend caught error: `"getaddrinfo ENOTFOUND nonexistent-host-test..."` with timeout | **PASS** ✅ |
 
-Compound Index: `{ officeId: 1, userId: 1 }` (unique).
+---
 
-### Office Layout Schema (`backend/src/models/Office.js`)
-| Field | Type | Required | Constraints / Default | Description |
+## 4. Console Evidence
+
+### A. Live MongoDB Atlas & Schema Test Suite (`npm run test-db`)
+```text
+================================================================
+    ProxiSpeak Member 4 — MongoDB Atlas & Schema Test Suite     
+================================================================
+
+Test 1: Connecting to MongoDB Atlas...
+[MongoDB] Connected successfully to: ac-6nq1jw8-shard-00-01.w15le4t.mongodb.net
+[MongoDB] Active database: proxispeak
+✅ PASS: Connected to MongoDB Atlas cluster.
+
+Test 2: Inserting valid Presence document...
+✅ PASS: Document inserted with ID: 6ad11972d6ec9a14d4c514ce
+   userId: test-user-1792088434156, officeId: office_1
+   x: 350, y: 220, isOnline: true
+   lastSeen: 2026-10-15T18:20:34.156Z
+
+Test 3: Reading document back and validating coordinates...
+✅ PASS: Coordinates accurately verified: (350, 220)
+
+Test 4: Testing schema validation on invalid inputs...
+   ✓ Correctly rejected: Negative X coordinate (-20)
+   ✓ Correctly rejected: X coordinate exceeding office boundary (850 > 800)
+   ✓ Correctly rejected: Negative Y coordinate (-5)
+   ✓ Correctly rejected: Y coordinate exceeding office boundary (550 > 500)
+   ✓ Correctly rejected: Missing required officeId
+   ✓ Correctly rejected: Missing required userId
+✅ PASS: All invalid input cases were rejected by schema validation.
+
+Test 5: Verifying Office Layout model with obstacles...
+✅ PASS: Office layout created and verified:
+   officeId: office-test-1792088434372, dimensions: 800x500
+   obstacles count: 2 (North Dividing Wall, Dev Cluster A)
+
+Test 6: Cleaning up test artifacts...
+✅ PASS: Temporary test documents removed from Atlas.
+
+================================================================
+ 🎉 ALL 6/6 DATABASE TESTS PASSED SUCCESSFULLY!
+================================================================
+```
+
+### B. Integration Test Suite (`npm run test-integration`)
+```text
+================================================================
+      ProxiSpeak Day 3 — Integration Testing Test Suite        
+================================================================
+
+[Test Server] Running on http://localhost:52987
+
+--- Scenario 1: Two users join the same office ---
+[Socket] User connected: HE1SkwN1BO_N61nyAAAA
+[Socket] User connected: nmERfFARqkOXUAHNAAAB
+Result: ✅ PASS
+
+--- Scenario 2: A user moves ---
+Result: ✅ PASS
+
+--- Scenario 3: Multiple users move together ---
+Result: ✅ PASS
+
+--- Scenario 4: A user disconnects ---
+[Socket] User disconnected: nmERfFARqkOXUAHNAAAB
+Result: ✅ PASS
+
+--- Scenario 5: Invalid coordinates are sent ---
+Invalid movement coordinates: HE1SkwN1BO_N61nyAAAA { x: 1200, y: -90 }
+Result: ✅ PASS
+
+--- Scenario 6: Database connection fails ---
+[Socket] User disconnected: HE1SkwN1BO_N61nyAAAA
+Result: ✅ PASS
+
+================================================================
+                INTEGRATION TEST RESULTS SUMMARY                
+================================================================
+
+┌─────────┬──────────────────────────────────┬──────────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────┬──────────┐
+│ (index) │ Test                             │ Expected Result                          │ Actual Result                                                            │ Status   │
+├─────────┼──────────────────────────────────┼──────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────┼──────────┤
+│ 0       │ 'Two users join the same office' │ 'Both appear'                            │ 'Both appear in presence:update lists on each client'                    │ 'PASSED' │
+│ 1       │ 'A user moves'                   │ 'Other clients receive the new position' │ 'Other client received updated position (320, 240)'                      │ 'PASSED' │
+│ 2       │ 'Multiple users move together'   │ 'Each avatar remains independent'        │ 'Independent positions preserved: User A=(150, 120), User B=(450, 380)'  │ 'PASSED' │
+│ 3       │ 'A user disconnects'             │ 'Their avatar disappears'                │ "Client received 'user:left' event for user_B"                           │ 'PASSED' │
+│ 4       │ 'Invalid coordinates are sent'   │ 'Server rejects them'                    │ "Server caught invalid coords and emitted 'error:invalid_coordinates'"   │ 'PASSED' │
+│ 5       │ 'Database connection fails'      │ 'Backend reports the failure'            │ 'Backend caught error: "getaddrinfo ENOTFOUND nonexistent-host-test..."' │ 'PASSED' │
+└─────────┴──────────────────────────────────┴──────────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────┴──────────┘
+
+🎉 ALL 6 INTEGRATION TEST SCENARIOS PASSED SUCCESSFULLY!
+```
+
+---
+
+## 5. Bug Register, Assignments & Retest Results
+
+| Bug ID | Description | Root Cause | Assigned Member | Resolution & Retest Result |
 |---|---|---|---|---|
-| `officeId` | String | Yes | Unique, Indexed | Unique room identifier |
-| `name` | String | Yes | Trimmed | Human-readable office name |
-| `width` | Number | Yes | Default: `800` | Office canvas width in pixels |
-| `height` | Number | Yes | Default: `500` | Office canvas height in pixels |
-| `obstacles` | Array | No | Sub-schema | List of obstacles and collision zones |
-| `createdAt` | Date | No | Default: `Date.now` | Timestamp created |
-| `updatedAt` | Date | No | Default: `Date.now` | Timestamp updated |
-
-#### Obstacle Sub-Schema
-- `obstacleId`: String (required)
-- `type`: Enum `["wall", "desk", "meeting_room", "lounge", "door", "custom"]`
-- `label`: String
-- `x`: Number (0–800)
-- `y`: Number (0–500)
-- `width`: Number
-- `height`: Number
-
----
-
-## 4. Task 3: Database Operations & Validation Test Results
-
-Automated tests in `backend/src/test-db.js` (`npm run test-db`):
-
-| Test # | Test Description | Input / Action | Result | Status |
-|---|---|---|---|---|
-| 1 | Atlas Connection | Connect with `MONGODB_URI` from `.env` | Successfully connected to Atlas | ✅ PASS |
-| 2 | Document Insert | Insert valid Presence `(x: 350, y: 220)` | Saved with generated `_id` | ✅ PASS |
-| 3 | Document Readback | Query by `userId` and `officeId` | Retrieved and coordinates match `(350, 220)` | ✅ PASS |
-| 4a | Negative X Coordinate | `x: -20, y: 100` | Schema validation rejected input | ✅ PASS |
-| 4b | X Out-of-Bounds | `x: 850 > 800, y: 100` | Schema validation rejected input | ✅ PASS |
-| 4c | Negative Y Coordinate | `x: 100, y: -5` | Schema validation rejected input | ✅ PASS |
-| 4d | Y Out-of-Bounds | `x: 100, y: 550 > 500` | Schema validation rejected input | ✅ PASS |
-| 4e | Missing `officeId` | `{ userId: '...', x: 100, y: 100 }` | Schema validation rejected input | ✅ PASS |
-| 4f | Missing `userId` | `{ officeId: '...', x: 100, y: 100 }` | Schema validation rejected input | ✅ PASS |
-| 5 | Office Layout Verification | Insert office with 2 obstacles | Layout dimensions & obstacles read back | ✅ PASS |
-| 6 | Database Cleanup | Delete temporary test documents | Documents removed cleanly from Atlas | ✅ PASS |
-
-**Score: 6/6 Passed**
-
----
-
-## 5. Task 4: Integration Testing Results Matrix
-
-Automated test runner in `backend/src/test-integration.js` (`npm run test-integration`):
-
-| # | Test Scenario | Expected Result | Actual Result | Status |
-|---|---|---|---|---|
-| 1 | Two users join one office | Both appear | User A and User B received `presence:update` containing both avatars | ✅ PASSED |
-| 2 | One user moves | Other browser receives the position | User A moved to `(320, 240)`; User B received updated coordinates | ✅ PASSED |
-| 3 | A user disconnects | Their avatar disappears | User B disconnected; User A received `user:left` event for `user_B` | ✅ PASSED |
-| 4 | Invalid coordinates are sent | Server rejects them | User A sent `(1200, -90)`; server rejected move and emitted `error:invalid_coordinates` | ✅ PASSED |
-| 5 | MongoDB is unavailable | Backend reports connection failure | Server caught unreachable host with timeout and reported error | ✅ PASSED |
-
-**Score: 5/5 Passed**
-
----
-
-## 6. Task 5: Coordination with Member 1 (Persistence Strategy)
-
-- **Strategy**: Dual-layer state management for Week 1:
-  1. **In-Memory Live Broadcast (Fast-path)**: High-frequency movements (`avatar:move` at 60fps) are tracked in Node.js memory (`users = new Map()`) and broadcast via Socket.IO rooms. **No synchronous database writes occur on movement ticks**, eliminating I/O bottlenecks and latency spikes.
-  2. **MongoDB Asynchronous Persistence (Slow-path)**:
-     - On `user:join`: Upsert `Presence` with `isOnline: true`, initial coordinates, and `lastSeen: Date.now()`.
-     - On `disconnect`: Update `Presence` with `isOnline: false`, final coordinates, and `lastSeen: Date.now()`.
-     - Non-blocking: DB queries are executed asynchronously without impeding websocket message delivery.
-
----
-
-## 7. Frontend Bug Fixes Completed
-
-1. **`RealtimeAvatarDemo.jsx`**: Removed stray syntax error `bu*` on line 1; corrected title formatting.
-2. **`OfficeCanvas.jsx`**: Created missing component with canvas grid, designated office zones (Meeting Room, Lounge, Workstations), avatar rendering, and user identity tags.
-3. **Frontend Build**: Configured `vite.config.mjs` and installed dependencies; `npm run build` succeeds cleanly with 0 errors.
+| **BUG-01** | Syntax error in `RealtimeAvatarDemo.jsx` | Stray `bu*` token at line 1 causing compilation failure | **Member 2** (Frontend) | **Resolved**: Removed token and repaired character encoding. Vite production build passed with 0 errors. |
+| **BUG-02** | Missing `OfficeCanvas.jsx` component | Component imported by `RealtimeAvatarDemo.jsx` was not created | **Member 2** (Frontend) | **Resolved**: Implemented `OfficeCanvas.jsx` supporting 800×500 canvas grid, office zones, and avatar rendering. |
+| **BUG-03** | `ReferenceError: isValidOfficeId is not defined` | `socketHandlers.js` checked `!isValidOfficeId(officeId)` without defining the helper | **Member 1** (Backend) | **Resolved**: Defined `isValidOfficeId` supporting flexible office IDs. Retested: Scenario 1 & 3 passed cleanly. |
+| **BUG-04** | Variable scope error in MongoDB persistence hook | `initialX` and `initialY` were referenced in asynchronous write hook without being defined | **Member 4** (Database) | **Resolved**: Correctly mapped coordinates to `posX` and `posY`. Non-blocking DB write executes without errors. |
+| **BUG-05** | Missing `dotenv` in `database/` package | Running `node src/test-db.js` in `database/` failed with `Cannot find module 'dotenv'` | **Member 4** (Database) | **Resolved**: Installed dependencies via `npm install`. Database tests now pass 100%. |
+| **BUG-06** | Accidental file `tatus` in repository root | Typo from terminal command execution | **Member 4** (Database) | **Resolved**: Removed erroneous file and verified clean git state. |

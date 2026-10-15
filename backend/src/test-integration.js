@@ -27,9 +27,9 @@ async function runIntegrationTests() {
 
   try {
     // -------------------------------------------------------------
-    // Scenario 1: Two users join one office -> Both appear
+    // Scenario 1: Two users join the same office -> Both appear
     // -------------------------------------------------------------
-    console.log("--- Scenario 1: Two users join one office ---");
+    console.log("--- Scenario 1: Two users join the same office ---");
     const clientA = Client(serverUrl, { transports: ["websocket"], forceNew: true });
     const clientB = Client(serverUrl, { transports: ["websocket"], forceNew: true });
 
@@ -61,17 +61,17 @@ async function runIntegrationTests() {
 
     const s1Passed = clientAReceivedB && clientBReceivedA;
     results.push({
-      test: "Two users join one office",
+      test: "Two users join the same office",
       expected: "Both appear",
-      actual: s1Passed ? "Both users appeared on each other's clients" : `A received B: ${clientAReceivedB}, B received A: ${clientBReceivedA}`,
+      actual: s1Passed ? "Both appear in presence:update lists on each client" : `A received B: ${clientAReceivedB}, B received A: ${clientBReceivedA}`,
       passed: s1Passed
     });
     console.log(`Result: ${s1Passed ? "✅ PASS" : "❌ FAIL"}\n`);
 
     // -------------------------------------------------------------
-    // Scenario 2: One user moves -> Other browser receives position
+    // Scenario 2: A user moves -> Other clients receive the new position
     // -------------------------------------------------------------
-    console.log("--- Scenario 2: One user moves ---");
+    console.log("--- Scenario 2: A user moves ---");
     let movedPosition = null;
 
     clientB.on("presence:update", (users) => {
@@ -92,17 +92,54 @@ async function runIntegrationTests() {
 
     const s2Passed = movedPosition !== null;
     results.push({
-      test: "One user moves",
-      expected: "Other browser receives the position",
-      actual: s2Passed ? `Browser B received position (${movedPosition.x}, ${movedPosition.y})` : "Browser B did not receive updated position",
+      test: "A user moves",
+      expected: "Other clients receive the new position",
+      actual: s2Passed ? `Other client received updated position (${movedPosition.x}, ${movedPosition.y})` : "Other client did not receive position",
       passed: s2Passed
     });
     console.log(`Result: ${s2Passed ? "✅ PASS" : "❌ FAIL"}\n`);
 
     // -------------------------------------------------------------
-    // Scenario 3: A user disconnects -> Their avatar disappears
+    // Scenario 3: Multiple users move together -> Each avatar remains independent
     // -------------------------------------------------------------
-    console.log("--- Scenario 3: A user disconnects ---");
+    console.log("--- Scenario 3: Multiple users move together ---");
+    let userASeenByB = null;
+    let userBSeenByA = null;
+
+    clientB.on("presence:update", (users) => {
+      const uA = users.find((u) => u.userId === "user_A");
+      if (uA && uA.x === 150 && uA.y === 120) {
+        userASeenByB = uA;
+      }
+    });
+
+    clientA.on("presence:update", (users) => {
+      const uB = users.find((u) => u.userId === "user_B");
+      if (uB && uB.x === 450 && uB.y === 380) {
+        userBSeenByA = uB;
+      }
+    });
+
+    // Both users move simultaneously to independent positions
+    clientA.emit("avatar:move", { userId: "user_A", officeId: "office_1", x: 150, y: 120 });
+    clientB.emit("avatar:move", { userId: "user_B", officeId: "office_1", x: 450, y: 380 });
+
+    await new Promise((r) => setTimeout(r, 350));
+
+    const s3Passed = userASeenByB !== null && userBSeenByA !== null &&
+                     (userASeenByB.x !== userBSeenByA.x || userASeenByB.y !== userBSeenByA.y);
+    results.push({
+      test: "Multiple users move together",
+      expected: "Each avatar remains independent",
+      actual: s3Passed ? `Independent positions preserved: User A=(150, 120), User B=(450, 380)` : "Positions collided or not received",
+      passed: s3Passed
+    });
+    console.log(`Result: ${s3Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+
+    // -------------------------------------------------------------
+    // Scenario 4: A user disconnects -> Their avatar disappears
+    // -------------------------------------------------------------
+    console.log("--- Scenario 4: A user disconnects ---");
     let leftUserData = null;
 
     clientA.on("user:left", (data) => {
@@ -112,19 +149,19 @@ async function runIntegrationTests() {
     clientB.disconnect();
     await new Promise((r) => setTimeout(r, 300));
 
-    const s3Passed = leftUserData && leftUserData.userId === "user_B";
+    const s4Passed = leftUserData && leftUserData.userId === "user_B";
     results.push({
       test: "A user disconnects",
       expected: "Their avatar disappears",
-      actual: s3Passed ? `Browser A received 'user:left' event for ${leftUserData.userId}` : "Disconnect event not received",
-      passed: s3Passed
+      actual: s4Passed ? `Client received 'user:left' event for ${leftUserData.userId}` : "Disconnect event not received",
+      passed: s4Passed
     });
-    console.log(`Result: ${s3Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+    console.log(`Result: ${s4Passed ? "✅ PASS" : "❌ FAIL"}\n`);
 
     // -------------------------------------------------------------
-    // Scenario 4: Invalid coordinates are sent -> Server rejects them
+    // Scenario 5: Invalid coordinates are sent -> Server rejects them
     // -------------------------------------------------------------
-    console.log("--- Scenario 4: Invalid coordinates are sent ---");
+    console.log("--- Scenario 5: Invalid coordinates are sent ---");
     let rejectionReceived = false;
 
     clientA.on("error:invalid_coordinates", (err) => {
@@ -141,21 +178,21 @@ async function runIntegrationTests() {
 
     await new Promise((r) => setTimeout(r, 300));
 
-    const s4Passed = rejectionReceived;
+    const s5Passed = rejectionReceived;
     results.push({
       test: "Invalid coordinates are sent",
       expected: "Server rejects them",
-      actual: s4Passed ? "Server caught invalid coords and emitted 'error:invalid_coordinates'" : "Server did not reject invalid coords",
-      passed: s4Passed
+      actual: s5Passed ? "Server caught invalid coords and emitted 'error:invalid_coordinates'" : "Server did not reject invalid coords",
+      passed: s5Passed
     });
-    console.log(`Result: ${s4Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+    console.log(`Result: ${s5Passed ? "✅ PASS" : "❌ FAIL"}\n`);
 
     clientA.disconnect();
 
     // -------------------------------------------------------------
-    // Scenario 5: MongoDB is unavailable -> Backend reports connection failure
+    // Scenario 6: Database connection fails -> Backend reports the failure
     // -------------------------------------------------------------
-    console.log("--- Scenario 5: MongoDB is unavailable ---");
+    console.log("--- Scenario 6: Database connection fails ---");
     let errorHandledCorrectly = false;
     let reportedErrorMessage = "";
 
@@ -168,14 +205,14 @@ async function runIntegrationTests() {
       reportedErrorMessage = dbErr.message;
     }
 
-    const s5Passed = errorHandledCorrectly;
+    const s6Passed = errorHandledCorrectly;
     results.push({
-      test: "MongoDB is unavailable",
-      expected: "Backend reports the connection failure",
-      actual: s5Passed ? `Backend caught error: "${reportedErrorMessage.substring(0, 50)}..."` : "Connection failure was not handled",
-      passed: s5Passed
+      test: "Database connection fails",
+      expected: "Backend reports the failure",
+      actual: s6Passed ? `Backend caught error: "${reportedErrorMessage.substring(0, 50)}..."` : "Connection failure was not handled",
+      passed: s6Passed
     });
-    console.log(`Result: ${s5Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+    console.log(`Result: ${s6Passed ? "✅ PASS" : "❌ FAIL"}\n`);
 
     // -------------------------------------------------------------
     // Summary Table
@@ -192,7 +229,7 @@ async function runIntegrationTests() {
 
     const allPassed = results.every(r => r.passed);
     if (allPassed) {
-      console.log("\n🎉 ALL 5 INTEGRATION TEST SCENARIOS PASSED SUCCESSFULLY!\n");
+      console.log("\n🎉 ALL 6 INTEGRATION TEST SCENARIOS PASSED SUCCESSFULLY!\n");
     } else {
       console.log("\n❌ SOME INTEGRATION TESTS FAILED\n");
       process.exitCode = 1;

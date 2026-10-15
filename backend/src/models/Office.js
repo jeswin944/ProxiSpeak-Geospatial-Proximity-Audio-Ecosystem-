@@ -1,9 +1,13 @@
 ﻿const mongoose = require("mongoose");
 
+/**
+ * Obstacle Sub-Schema — Physical boundaries and acoustic zones within an office layout
+ */
 const obstacleSchema = new mongoose.Schema({
   obstacleId: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   type: {
     type: String,
@@ -35,15 +39,26 @@ const obstacleSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 0
+  },
+  // Future proximity audio readiness: acoustic attenuation/wall absorption
+  audioAbsorption: {
+    type: Number,
+    default: 0.5, // 0 = transparent, 1 = total sound dampening
+    min: 0,
+    max: 1
   }
 }, { _id: false });
 
+/**
+ * Office Schema — Floor dimensions, metadata, and spatial obstacle definitions
+ */
 const officeSchema = new mongoose.Schema({
   officeId: {
     type: String,
     required: true,
     unique: true,
-    index: true
+    index: true,
+    trim: true
   },
   name: {
     type: String,
@@ -63,6 +78,12 @@ const officeSchema = new mongoose.Schema({
   obstacles: {
     type: [obstacleSchema],
     default: []
+  },
+  // Future proximity audio readiness: default falloff radius for this office
+  defaultProximityRadius: {
+    type: Number,
+    default: 150,
+    min: 0
   },
   createdAt: {
     type: Date,
