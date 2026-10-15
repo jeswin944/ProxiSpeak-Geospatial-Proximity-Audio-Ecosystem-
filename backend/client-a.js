@@ -12,15 +12,21 @@ socket.on("connect", () => {
   });
 
   setTimeout(() => {
-    socket.emit("avatar:move", {
+    const movement = {
       userId: "user_101",
       officeId: "office_1",
       x: 250,
       y: 180
-    });
+    };
 
-    console.log("Browser A sent movement coordinates");
-  }, 1000);
+    console.log(
+      new Date().toLocaleTimeString(),
+      "Sending movement:",
+      movement
+    );
+
+    socket.emit("avatar:move", movement);
+  }, 3000);
 });
 
 socket.on("presence:update", (users) => {
