@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const Presence = require("../models/Presence");
 
 function registerSocketHandlers(io) {

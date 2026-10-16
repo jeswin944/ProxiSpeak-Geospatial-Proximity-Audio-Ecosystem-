@@ -1,4 +1,4 @@
-﻿const Presence = require("./Presence");
+const Presence = require("./Presence");
 const Office = require("./Office");
 const User = require("./User");
 
