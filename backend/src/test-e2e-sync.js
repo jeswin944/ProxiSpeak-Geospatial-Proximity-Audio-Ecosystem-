@@ -37,6 +37,7 @@ async function runEndToEndDatabaseSyncTest() {
     console.log(`Step 3: Connecting Socket client as ${testUserId}...`);
     const client = Client(`http://localhost:${port}`, { transports: ["websocket"] });
     await new Promise((res) => client.on("connect", res));
+    console.log("   Client connected.\n");
 
     client.emit("user:join", {
       userId: testUserId,
@@ -45,8 +46,8 @@ async function runEndToEndDatabaseSyncTest() {
       y: 140
     });
 
-    // Wait for database upsert to complete
-    await new Promise((r) => setTimeout(r, 600));
+    // Wait for database upsert to complete (MongoDB Atlas cold start can be slower)
+    await new Promise((r) => setTimeout(r, 2000));
 
     // Step 4: Verify MongoDB contains the joined user
     console.log("Step 4: Querying MongoDB Atlas for user join record...");
@@ -68,8 +69,8 @@ async function runEndToEndDatabaseSyncTest() {
       y: 260
     });
 
-    // Wait for throttled DB write
-    await new Promise((r) => setTimeout(r, 1200));
+    // Wait for throttled DB write (throttle is 500ms, give 2s for Atlas round-trip)
+    await new Promise((r) => setTimeout(r, 2000));
 
     // Step 6: Verify MongoDB Atlas updated the coordinates
     console.log("Step 6: Querying MongoDB Atlas for updated coordinates...");
@@ -86,7 +87,7 @@ async function runEndToEndDatabaseSyncTest() {
     console.log("Step 7: Client disconnects...");
     client.disconnect();
 
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 1500));
 
     const finalDoc = await Presence.findOne({ userId: testUserId, officeId: testOfficeId });
     if (!finalDoc) {
@@ -114,6 +115,6 @@ async function runEndToEndDatabaseSyncTest() {
 }
 
 runEndToEndDatabaseSyncTest().catch((err) => {
-  console.error("❌ E2E TEST FAILED:", err);
+  console.error("❌ E2E TEST FAILED:", err.message);
   process.exit(1);
 });

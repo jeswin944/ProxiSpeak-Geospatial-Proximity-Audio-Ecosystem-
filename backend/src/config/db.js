@@ -1,4 +1,5 @@
-﻿const mongoose = require("mongoose");
+﻿require("dotenv").config();
+const mongoose = require("mongoose");
 
 /**
  * Connect to MongoDB Atlas using MONGODB_URI from environment.
@@ -7,7 +8,7 @@
 async function connectDB() {
   try {
     await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
     });
     console.log(
       `[MongoDB] Connected successfully to: ${mongoose.connection.host}`
