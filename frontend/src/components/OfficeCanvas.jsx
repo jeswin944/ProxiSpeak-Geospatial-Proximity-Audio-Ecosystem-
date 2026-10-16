@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import "./OfficeCanvas.css";
 
 const OFFICE_WIDTH = 800;

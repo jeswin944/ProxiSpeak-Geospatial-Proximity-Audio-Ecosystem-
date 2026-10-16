@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 /**
  * Obstacle Sub-Schema — Physical boundaries and acoustic zones within an office layout

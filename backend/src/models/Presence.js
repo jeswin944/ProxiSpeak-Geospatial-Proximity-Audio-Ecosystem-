@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 /**
  * Presence Schema — Geospatial presence tracking for avatars in office spaces
