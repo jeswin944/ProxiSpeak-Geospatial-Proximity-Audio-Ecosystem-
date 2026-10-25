@@ -1,0 +1,238 @@
+.ps-graph-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: calc(100vh - 64px);
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+.ps-graph-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(30, 41, 59, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.ps-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ps-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.ps-btn:hover {
+  background: #334155;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.ps-btn-primary {
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.ps-btn-primary:hover {
+  background: #2563eb;
+}
+
+.ps-btn-stop {
+  background: #ef4444;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+.ps-btn-stop:hover {
+  background: #dc2626;
+}
+
+.ps-graph-canvas {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Custom React Flow Node Styling */
+.ps-node {
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  min-width: 190px;
+  padding: 0;
+  color: #f8fafc;
+  font-size: 12px;
+  overflow: visible;
+  transition: border-color 0.15s ease;
+}
+
+.ps-node:hover {
+  border-color: #38bdf8;
+}
+
+.ps-node-source {
+  border-top: 3px solid #10b981;
+}
+
+.ps-node-math {
+  border-top: 3px solid #3b82f6;
+}
+
+.ps-node-action {
+  border-top: 3px solid #f59e0b;
+}
+
+.ps-node-header {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ps-node-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.badge-source { color: #34d399; }
+.badge-math { color: #60a5fa; }
+.badge-action { color: #fbbf24; }
+
+.ps-node-title {
+  font-weight: 600;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.ps-node-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ps-node-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-node-field label {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ps-input, .ps-select {
+  background: #090d16;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #f1f5f9;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+}
+
+.ps-input:focus, .ps-select:focus {
+  border-color: #38bdf8;
+}
+
+.ps-safety-pill {
+  font-size: 10px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.ps-node-hint {
+  font-size: 10px;
+  color: #64748b;
+  font-style: italic;
+}
+
+.ps-handle {
+  width: 10px;
+  height: 10px;
+  background: #38bdf8;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+}
+
+.ps-handle-label {
+  position: absolute;
+  font-size: 9px;
+  font-weight: bold;
+  color: #94a3b8;
+}
+
+/* Console Panel */
+.ps-graph-console {
+  height: 160px;
+  background: #090d16;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ps-console-header {
+  padding: 6px 14px;
+  background: #131b2e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  display: flex;
+  justify-content: space-between;
+}
+
+.ps-console-logs {
+  flex: 1;
+  padding: 8px 14px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-log-entry {
+  display: flex;
+  gap: 8px;
+  color: #cbd5e1;
+}
+
+.ps-log-time { color: #64748b; }
+.ps-log-action { color: #fbbf24; font-weight: 600; }
+.ps-log-msg { color: #38bdf8; }
+.ps-log-error { color: #f87171; }

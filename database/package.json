@@ -4,7 +4,8 @@
   "description": "ProxiSpeak MongoDB Database and Geospatial Engine",
   "main": "index.js",
   "scripts": {
-    "test": "echo Database module active"
+    "test": "echo Database module active",
+    "benchmark": "node src/benchmark-ingestion.js"
   },
   "keywords": [
     "proxispeak",
