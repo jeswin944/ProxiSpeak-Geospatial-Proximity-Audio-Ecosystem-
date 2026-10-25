@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { socket } from "../socket";
 import OfficeCanvas from "./OfficeCanvas";
 
@@ -40,6 +40,33 @@ export default function RealtimeAvatarDemo() {
   const [users, setUsers] = useState([]);
   const positionRef = useRef(position);
   positionRef.current = position;
+  const lastMouseEmitRef = useRef({ x: position.x, y: position.y });
+
+  // Handle pointer / mouse click and click-and-drag avatar movement
+  const handleMoveAvatar = useCallback(
+    (newX, newY) => {
+      const clampedX = Math.max(0, Math.min(OFFICE_WIDTH - AVATAR_SIZE, newX));
+      const clampedY = Math.max(0, Math.min(OFFICE_HEIGHT - AVATAR_SIZE, newY));
+
+      setPosition({ x: clampedX, y: clampedY });
+
+      // Emit movement event if moved by at least 2px
+      const last = lastMouseEmitRef.current;
+      if (
+        socket.connected &&
+        (Math.abs(clampedX - last.x) >= 2 || Math.abs(clampedY - last.y) >= 2)
+      ) {
+        socket.emit("avatar:move", {
+          userId,
+          officeId,
+          x: Math.round(clampedX),
+          y: Math.round(clampedY),
+        });
+        lastMouseEmitRef.current = { x: clampedX, y: clampedY };
+      }
+    },
+    [userId, officeId]
+  );
 
   // Socket.IO connection and presence synchronization
   useEffect(() => {
@@ -262,7 +289,11 @@ export default function RealtimeAvatarDemo() {
       </div>
 
       {/* Office Canvas */}
-      <OfficeCanvas users={users} currentUserId={userId} />
+      <OfficeCanvas
+        users={users}
+        currentUserId={userId}
+        onMoveAvatar={handleMoveAvatar}
+      />
 
       {/* Controls & Instructions */}
       <div
@@ -276,7 +307,7 @@ export default function RealtimeAvatarDemo() {
           border: "1px solid #334155",
         }}
       >
-        <strong style={{ color: "#e2e8f0" }}>Controls:</strong> Hold <kbd>W</kbd>, <kbd>A</kbd>, <kbd>S</kbd>, <kbd>D</kbd> or the Arrow keys to move. Open this page in a second browser window to see multiplayer avatars move together in real-time.
+        <strong style={{ color: "#e2e8f0" }}>Controls:</strong> Hold <kbd>W</kbd>, <kbd>A</kbd>, <kbd>S</kbd>, <kbd>D</kbd> or the Arrow keys to move, or <strong>click &amp; drag</strong> anywhere on the office floor. The circular cyan glow visualizes your active spatial audio proximity radius (150px). Open a second tab to see multiplayer synchronization in real time.
       </div>
     </main>
   );

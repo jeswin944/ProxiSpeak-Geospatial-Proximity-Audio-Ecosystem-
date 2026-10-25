@@ -1,45 +1,20 @@
-.office-canvas {
+.office-canvas-container {
   width: 100%;
-  overflow: auto;
-  padding: 12px 0;
-}
-
-.office-room {
-  position: relative;
-  box-sizing: border-box;
-  border: 2px solid #64748b;
+  max-width: 800px;
+  margin: 0 auto;
   border-radius: 12px;
-  background-color: #f8fafc;
-  background-image:
-    linear-gradient(#e2e8f0 1px, transparent 1px),
-    linear-gradient(90deg, #e2e8f0 1px, transparent 1px);
-  background-size: 25px 25px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  border: 1px solid #334155;
+  background-color: #0f172a;
 }
 
-.office-avatar {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: 2px solid white;
-  box-shadow: 0 2px 6px #0003;
-}
-
-.current-avatar {
-  background-color: #2563eb;
-}
-
-.other-avatar {
-  background-color: #16a34a;
-}
-
-.office-avatar span {
-  position: absolute;
-  top: 27px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font: 12px Arial, sans-serif;
-  color: #0f172a;
+.office-html5-canvas {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 800 / 500;
+  height: auto;
+  user-select: none;
+  -webkit-user-select: none;
 }
