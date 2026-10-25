@@ -134,7 +134,6 @@ ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem/
 │   │   └── test-db.js          # Automated Atlas test script
 │   ├── index.js                # Database package entry point
 │   ├── package.json            # Database scripts & dependencies
-│   ├── SCHEMAS.md              # Detailed schema design documentation
 │   ├── .env.example            # Database environment template
 │   └── .gitignore              # Protects live credentials
 ├── frontend/                   # Canvas UI & avatar navigation (Member 2)
