@@ -9,6 +9,10 @@ const registerSocketHandlers = require("./socket/socketHandlers");
 
 const app = express();
 app.use(cors());
+app.use(express.json({ limit: "2mb" }));
+
+const graphRoutes = require("./routes/graphRoutes");
+app.use("/api/graph", graphRoutes);
 
 const server = http.createServer(app);
 

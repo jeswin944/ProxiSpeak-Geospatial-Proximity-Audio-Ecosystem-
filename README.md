@@ -62,6 +62,41 @@
 
 ---
 
+## ⚡ Week 2 & Mid-Project Review Deliverables
+
+| Deliverable | Core Technology | Highlights & Status |
+| :--- | :--- | :--- |
+| **Logic Compiler** | Node.js, RxJS Observables, Express | Compiles saved React Flow JSON into executable RxJS pipelines; Kahn's Algorithm cycle detection (DAG enforcement); memory leak prevention. **(7/7 Tests Passed)** |
+| **Node Library** | React Flow (`@xyflow/react`), RxJS | Reusable nodes for Data Sources, Math Operations (arithmetic, comparisons, zero-division safety), and Action Triggers (rate-limited logger, event emitter, threshold alerts). **(10/10 Tests Passed)** |
+| **Graph Serialization** | JSON, React Flow Schema v1.0.0 | Versioned serialization/deserialization engine; cleans transient DOM state; preserves exact node/edge IDs, positions, and handles. Restores and executes complex branching pipelines. **(5/5 Tests Passed)** |
+| **MongoDB Ingestion Audit** | MongoDB Native Time-Series, Mongoose | High-throughput benchmark sustaining **6,238 writes/second** against live MongoDB Atlas (exceeding 5,000 writes/sec target) with ~15 bytes/doc compressed footprint. **(VERIFIED)** |
+
+### 🛠️ Week 2 & Mid-Review Module Breakdown
+
+#### 1. Logic Compiler (`backend/src/compiler/`)
+* **Pipeline:** Saved JSON → Structural Validation → Kahn's Cycle Analysis → RxJS Stream Synthesis → Safe Pipeline Execution.
+* **Cycle Detection:** Enforces Directed Acyclic Graph (DAG) topology using in-degree topological sort; flags all cyclic nodes and rejects loops.
+* **Memory Management:** Dedicated teardown hooks and unsubscriptions for all active Observables and Subjects upon `stop()`.
+* **REST Endpoints:** `/api/graph/validate`, `/api/graph/compile`, `/api/graph/execute`, `/api/graph/stop/:id`, `/api/graph/nodes`.
+
+#### 2. Visual Node Library (`frontend/src/components/GraphEditor/`)
+* **Data Sources:** `source_static`, `source_interval` (timer ticks), `source_manual` (interactive push), `source_mock_events` (proximity telemetry).
+* **Math Operations:** `math_operation` (add, subtract, multiply, divide, min, max, modulo, comparisons). Guards against division by zero with fallback values.
+* **Action Triggers:** `action_logger` (with `throttleTime` rate limiting), `action_event_emitter`, and `action_threshold_alert`.
+* **Editor Interface:** Full React Flow canvas with node palette, import/export, and live execution stream console.
+
+#### 3. Graph Serialization (`frontend/src/utils/graphSerialization.js`)
+* Schema-validated versioning (`schemaVersion: "1.0.0"`).
+* Guarantees round-trip equivalence without mutating source graph objects or creating duplicate elements.
+* Validated against complex multi-branching pipeline fixture (`backend/src/fixtures/complex-branching-graph.json`).
+
+#### 4. High-Throughput Ingestion Benchmark (`database/src/benchmark-ingestion.js`)
+* Tested against live MongoDB Atlas cluster with 10 parallel worker streams and 500-document batches.
+* Achieved **6,238 writes/second** (10,000 / 10,000 confirmed writes in 1.60s with 0 errors).
+* Leverages MongoDB native Time-Series collection (`timeseries: { timeField: "timestamp", metaField: "metadata", granularity: "seconds" }`) with 24-hour TTL.
+
+---
+
 ## 🗄️ Database Models & Schemas
 
 ### 1. Presence Schema (`database/src/models/Presence.js`)
@@ -111,6 +146,29 @@ Persistent user profile information and styling metadata.
 }
 ```
 
+### 4. TelemetryEvent Schema — Time-Series Collection (`database/src/models/TelemetryEvent.js`)
+Dedicated to high-frequency motion and proximity event ingestion. Configured with native MongoDB Time-Series optimization (`timeField: 'timestamp'`, `metaField: 'metadata'`, `granularity: 'seconds'`).
+
+```javascript
+{
+  timestamp: Date,              // Time-series timestamp (Required)
+  metadata: {
+    officeId: String,           // Stable office grouping
+    userId: String,             // User ID grouping
+    eventType: String,          // Telemetry classification
+    benchmarkRunId: String      // Run isolation identifier
+  },
+  data: {
+    x: Number,                  // Coordinate X
+    y: Number,                  // Coordinate Y
+    speed: Number,              // Velocity
+    signalStrength: Number      // Audio RF strength
+  }
+}
+```
+* **Time-Series TTL:** 24-hour retention (`expireAfterSeconds: 86400`).
+* **Compound Metadata Indexes:** `{ 'metadata.officeId': 1, timestamp: -1 }`, `{ 'metadata.benchmarkRunId': 1 }`.
+
 ---
 
 ## 📂 Repository Structure
@@ -119,26 +177,41 @@ Persistent user profile information and styling metadata.
 ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem/
 ├── backend/
 │   ├── src/
-│   │   └── models/
-│   │       └── Presence.js     # Shared model copy for backend
+│   │   ├── compiler/           # Week 2 Logic Compiler & RxJS operator factories
+│   │   ├── models/             # Presence, Office, User, and TelemetryEvent models
+│   │   ├── routes/             # REST API for graph validation & execution
+│   │   ├── services/           # GraphExecutionService runtime manager
+│   │   ├── socket/             # Socket.IO movement & presence handlers
+│   │   ├── test-compiler.js    # Logic compiler test suite
+│   │   ├── test-nodes.js       # Node library test suite
+│   │   ├── test-serialization.js # Graph serialization test suite
+│   │   ├── test-db.js          # Live Atlas CRUD validation
+│   │   └── test-integration.js # Multi-client Socket.IO test suite
 │   ├── .env.example            # Backend environment template
-│   └── .gitignore              # Ignores backend secrets
+│   └── package.json            # Backend dependencies & test scripts
 ├── database/
 │   ├── src/
-│   │   ├── models/
-│   │   │   ├── Office.js       # Office layout & obstacle schema
-│   │   │   ├── Presence.js     # Live coordinates schema
-│   │   │   ├── User.js         # User profile schema
-│   │   │   └── index.js        # Model bundle exports
+│   │   ├── models/             # Schema models (Presence, Office, User, TelemetryEvent)
 │   │   ├── db.js               # Reusable Mongoose connection manager
-│   │   └── test-db.js          # Automated Atlas test script
-│   ├── index.js                # Database package entry point
-│   ├── package.json            # Database scripts & dependencies
-│   ├── SCHEMAS.md              # Detailed schema design documentation
+│   │   └── benchmark-ingestion.js # High-throughput time-series ingestion benchmark
 │   ├── .env.example            # Database environment template
-│   └── .gitignore              # Protects live credentials
-├── frontend/                   # Canvas UI & avatar navigation (Member 2)
-├── docs/                       # Architectural specs & agreements
+│   └── package.json            # Database scripts & dependencies
+├── frontend/                   # Canvas UI, Avatar navigation & Logic Graph Editor
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── GraphEditor/    # React Flow editor, custom nodes & console
+│   │   │   ├── OfficeCanvas.jsx # HTML5 Canvas 2D office renderer
+│   │   │   └── RealtimeAvatarDemo.jsx # WASD keyboard/mouse movement demo
+│   │   └── utils/
+│   │       └── graphSerialization.js # Schema v1.0.0 serialization engine
+│   └── package.json            # Frontend Vite & React Flow configuration
+├── docs/                       # Specifications & Formal Audit Evidence
+│   ├── README.md               # Master documentation index
+│   ├── week1-integration-test-report.md
+│   ├── week2-logic-compiler.md
+│   ├── week2-node-library.md
+│   ├── mid-review-graph-serialization.md
+│   └── mid-review-mongodb-ingestion-audit.md
 └── README.md                   # Main ecosystem documentation
 ```
 
@@ -172,8 +245,14 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.w15le4t.mongodb.net/pro
 Execute the comprehensive test suites from the root directory or individual modules:
 
 ```bash
-# Run live MongoDB Atlas movement persistence test (20 steps)
-npm run test:live
+# Run Week 2 & Mid-Review verification suites (Compiler, Nodes, Serialization)
+npm test
+
+# Run high-throughput MongoDB Atlas ingestion benchmark (5,000+ writes/sec target)
+npm run benchmark:ingestion
+
+# Run all test suites (Compiler, Nodes, Serialization, DB, Integration)
+npm run test:all
 
 # Run multi-client Socket.IO integration tests (9 scenarios)
 npm run test:integration

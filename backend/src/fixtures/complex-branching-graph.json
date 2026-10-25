@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "complex-telemetry-pipeline",
+  "name": "Geospatial Telemetry Processing Graph",
+  "description": "Multi-source calculation with arithmetic chain, branching, and multiple action triggers",
+  "updatedAt": "2026-10-25T18:00:00.000Z",
+  "nodes": [
+    {
+      "id": "source-base-speed",
+      "type": "source_static",
+      "position": { "x": 50, "y": 80 },
+      "data": { "value": 15, "label": "Base Speed km/h" }
+    },
+    {
+      "id": "source-proximity-delta",
+      "type": "source_static",
+      "position": { "x": 50, "y": 220 },
+      "data": { "value": 5, "label": "Proximity Delta" }
+    },
+    {
+      "id": "math-sum",
+      "type": "math_operation",
+      "position": { "x": 320, "y": 140 },
+      "data": { "operation": "add", "label": "Effective Speed = Base + Delta" }
+    },
+    {
+      "id": "math-scale",
+      "type": "math_operation",
+      "position": { "x": 550, "y": 140 },
+      "data": { "operation": "multiply", "defaultB": 2, "label": "Audio Gain Scaler (x2)" }
+    },
+    {
+      "id": "action-audit-log",
+      "type": "action_logger",
+      "position": { "x": 820, "y": 50 },
+      "data": { "prefix": "[AUDIO-SCALER-AUDIT]", "throttleMs": 0 }
+    },
+    {
+      "id": "action-proximity-alert",
+      "type": "action_threshold_alert",
+      "position": { "x": 820, "y": 220 },
+      "data": { "threshold": 30, "comparison": "gt", "label": "High Speed Audio Alert" }
+    },
+    {
+      "id": "action-event-dispatcher",
+      "type": "action_event_emitter",
+      "position": { "x": 820, "y": 380 },
+      "data": { "eventName": "proxispeak:spatial_gain_update" }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-base-to-sum",
+      "source": "source-base-speed",
+      "target": "math-sum",
+      "sourceHandle": "out",
+      "targetHandle": "a"
+    },
+    {
+      "id": "edge-delta-to-sum",
+      "source": "source-proximity-delta",
+      "target": "math-sum",
+      "sourceHandle": "out",
+      "targetHandle": "b"
+    },
+    {
+      "id": "edge-sum-to-scale",
+      "source": "math-sum",
+      "target": "math-scale",
+      "sourceHandle": "out",
+      "targetHandle": "a"
+    },
+    {
+      "id": "edge-scale-branch-log",
+      "source": "math-scale",
+      "target": "action-audit-log",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge-scale-branch-alert",
+      "source": "math-scale",
+      "target": "action-proximity-alert",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge-scale-branch-emit",
+      "source": "math-scale",
+      "target": "action-event-dispatcher",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}
