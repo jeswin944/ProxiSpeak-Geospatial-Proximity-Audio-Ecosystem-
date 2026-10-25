@@ -215,6 +215,121 @@ async function runIntegrationTests() {
     console.log(`Result: ${s6Passed ? "✅ PASS" : "❌ FAIL"}\n`);
 
     // -------------------------------------------------------------
+    // Scenario 7: Client in another office does not receive updates
+    // -------------------------------------------------------------
+    console.log("--- Scenario 7: Room isolation across offices ---");
+    const clientOffice1 = Client(serverUrl, { transports: ["websocket"], forceNew: true });
+    const clientOffice2 = Client(serverUrl, { transports: ["websocket"], forceNew: true });
+
+    await Promise.all([
+      new Promise((res) => clientOffice1.on("connect", res)),
+      new Promise((res) => clientOffice2.on("connect", res))
+    ]);
+
+    let office2ReceivedLeak = false;
+    clientOffice2.on("presence:update", (users) => {
+      if (users.some((u) => u.userId === "user_isolated_1")) {
+        office2ReceivedLeak = true;
+      }
+    });
+
+    clientOffice1.emit("user:join", { userId: "user_isolated_1", officeId: "room_alpha", x: 100, y: 100 });
+    clientOffice2.emit("user:join", { userId: "user_isolated_2", officeId: "room_beta", x: 100, y: 100 });
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Move user in room_alpha
+    clientOffice1.emit("avatar:move", { userId: "user_isolated_1", officeId: "room_alpha", x: 250, y: 250 });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const s7Passed = !office2ReceivedLeak;
+    results.push({
+      test: "Room isolation across offices",
+      expected: "Client in another office does not receive movement updates",
+      actual: s7Passed ? "Zero cross-office leakage observed" : "Client in room_beta received update from room_alpha",
+      passed: s7Passed
+    });
+    console.log(`Result: ${s7Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+
+    clientOffice1.disconnect();
+    clientOffice2.disconnect();
+
+    // -------------------------------------------------------------
+    // Scenario 8: User cannot move another user's avatar (Impersonation)
+    // -------------------------------------------------------------
+    console.log("--- Scenario 8: Impersonation rejection ---");
+    const clientImposter = Client(serverUrl, { transports: ["websocket"], forceNew: true });
+    await new Promise((res) => clientImposter.on("connect", res));
+
+    let forbiddenReceived = false;
+    clientImposter.on("error:forbidden", () => {
+      forbiddenReceived = true;
+    });
+
+    clientImposter.emit("user:join", { userId: "legit_user", officeId: "office_sec", x: 100, y: 100 });
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Attempt to move another user's avatar
+    clientImposter.emit("avatar:move", { userId: "victim_user", officeId: "office_sec", x: 300, y: 300 });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const s8Passed = forbiddenReceived;
+    results.push({
+      test: "Identity impersonation rejection",
+      expected: "Server rejects movement under a different userId",
+      actual: s8Passed ? "Server caught identity mismatch and emitted 'error:forbidden'" : "Server did not reject impersonation attempt",
+      passed: s8Passed
+    });
+    console.log(`Result: ${s8Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+
+    clientImposter.disconnect();
+
+    // -------------------------------------------------------------
+    // Scenario 9: Reconnecting does not create duplicate presence
+    // -------------------------------------------------------------
+    console.log("--- Scenario 9: Reconnect duplicate prevention ---");
+    const clientRecon = Client(serverUrl, { transports: ["websocket"], forceNew: true });
+    await new Promise((res) => clientRecon.on("connect", res));
+
+    clientRecon.emit("user:join", { userId: "recon_user", officeId: "office_recon", x: 110, y: 110 });
+    await new Promise((r) => setTimeout(r, 200));
+
+    clientRecon.disconnect();
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Reconnect as same user
+    const clientRecon2 = Client(serverUrl, { transports: ["websocket"], forceNew: true });
+    await new Promise((res) => clientRecon2.on("connect", res));
+
+    clientRecon2.emit("user:join", { userId: "recon_user", officeId: "office_recon", x: 150, y: 150 });
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Second client joins to inspect office user list
+    const clientObserver = Client(serverUrl, { transports: ["websocket"], forceNew: true });
+    await new Promise((res) => clientObserver.on("connect", res));
+
+    let presenceList = [];
+    clientObserver.on("presence:update", (users) => {
+      presenceList = users;
+    });
+
+    clientObserver.emit("user:join", { userId: "observer_user", officeId: "office_recon", x: 200, y: 200 });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const reconOccurrences = presenceList.filter((u) => u.userId === "recon_user").length;
+    const s9Passed = reconOccurrences === 1;
+
+    results.push({
+      test: "Reconnect duplicate prevention",
+      expected: "Exactly one presence record for reconnected user",
+      actual: s9Passed ? `Exactly 1 instance of recon_user in presence list` : `Found ${reconOccurrences} instances of recon_user`,
+      passed: s9Passed
+    });
+    console.log(`Result: ${s9Passed ? "✅ PASS" : "❌ FAIL"}\n`);
+
+    clientRecon2.disconnect();
+    clientObserver.disconnect();
+
+    // -------------------------------------------------------------
     // Summary Table
     // -------------------------------------------------------------
     console.log("================================================================");
@@ -229,7 +344,7 @@ async function runIntegrationTests() {
 
     const allPassed = results.every(r => r.passed);
     if (allPassed) {
-      console.log("\n🎉 ALL 6 INTEGRATION TEST SCENARIOS PASSED SUCCESSFULLY!\n");
+      console.log(`\n🎉 ALL ${results.length} INTEGRATION TEST SCENARIOS PASSED SUCCESSFULLY!\n`);
     } else {
       console.log("\n❌ SOME INTEGRATION TESTS FAILED\n");
       process.exitCode = 1;

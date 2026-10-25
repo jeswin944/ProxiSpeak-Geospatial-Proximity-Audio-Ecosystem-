@@ -1,12 +1,98 @@
 const mongoose = require("mongoose");
 const Presence = require("../models/Presence");
 
+// Office boundary configurations (can be extended per office)
+const OFFICE_BOUNDARIES = {
+  office_1: { minX: 0, maxX: 800, minY: 0, maxY: 500 },
+  office_2: { minX: 0, maxX: 800, minY: 0, maxY: 500 },
+  default: { minX: 0, maxX: 800, minY: 0, maxY: 500 }
+};
+
+function getOfficeBounds(officeId) {
+  return OFFICE_BOUNDARIES[officeId] || OFFICE_BOUNDARIES.default;
+}
+
 function registerSocketHandlers(io) {
   // In-memory state for low-latency live position broadcasts (60fps)
   const users = new Map();
 
-  // Validate office IDs (allows office_1, office_2, office-1, office-main, etc.)
   const isValidOfficeId = (id) => typeof id === "string" && id.trim().length > 0;
+
+  // DB write executor with in-flight queue management
+  function executeDbSave(user, targetX, targetY, isOnline = true) {
+    if (mongoose.connection.readyState !== 1) return;
+
+    user.isSaving = true;
+    user.lastDbSave = Date.now();
+
+    Presence.findOneAndUpdate(
+      { userId: user.userId, officeId: user.officeId },
+      { $set: { x: targetX, y: targetY, isOnline, lastSeen: new Date() } },
+      { upsert: true, new: true, runValidators: true }
+    )
+      .then((doc) => {
+        if (doc) {
+          console.log(
+            `[MongoDB] Position persisted: ${user.userId} -> (${Math.round(targetX)}, ${Math.round(targetY)}) [online: ${isOnline}]`
+          );
+        } else {
+          console.warn(`[MongoDB] No document matched/returned for ${user.userId}`);
+        }
+      })
+      .catch((err) => {
+        // Sanitize error logging to prevent leaking credentials
+        console.error("[MongoDB] Movement persistence error:", err.message);
+      })
+      .finally(() => {
+        user.isSaving = false;
+
+        // If user disconnected while a write was in-flight, flush the offline record
+        if (user.pendingDisconnect) {
+          user.pendingDisconnect = false;
+          executeDbSave(user, user.x, user.y, false);
+          return;
+        }
+
+        // If a newer coordinate arrived while a write was in-flight, flush the latest position
+        if (user.pendingCoords) {
+          const next = user.pendingCoords;
+          user.pendingCoords = null;
+          executeDbSave(user, next.x, next.y, true);
+        }
+      });
+  }
+
+  // Throttled persistence scheduler (500ms throttle with trailing debounce)
+  function schedulePersistence(user) {
+    if (mongoose.connection.readyState !== 1) return;
+
+    const THROTTLE_MS = 500;
+    const now = Date.now();
+    const elapsed = now - (user.lastDbSave || 0);
+
+    if (user.isSaving) {
+      // In-flight write in progress: record latest coordinates to flush upon completion
+      user.pendingCoords = { x: user.x, y: user.y };
+      return;
+    }
+
+    if (elapsed >= THROTTLE_MS) {
+      executeDbSave(user, user.x, user.y, true);
+    } else {
+      // Within throttle interval: schedule trailing write to guarantee stopping position is saved
+      if (!user.trailingSaveTimer) {
+        const delay = Math.max(50, THROTTLE_MS - elapsed);
+        user.trailingSaveTimer = setTimeout(() => {
+          user.trailingSaveTimer = null;
+          if (user.isSaving) {
+            user.pendingCoords = { x: user.x, y: user.y };
+          } else {
+            executeDbSave(user, user.x, user.y, true);
+          }
+        }, delay);
+      }
+    }
+  }
 
   io.on("connection", (socket) => {
     console.log("[Socket] User connected:", socket.id);
@@ -24,18 +110,31 @@ function registerSocketHandlers(io) {
         return;
       }
 
-      // A socket can join only once
+      // A single socket cannot join multiple times
       if (socket.data.userId) {
         console.warn("Socket already joined:", socket.id);
         return;
       }
 
-      // Do not let another socket overwrite this user's active session
+      // Reconnect handling: if user exists from a disconnected/dead socket, allow clean rejoin
       if (users.has(userId)) {
-        console.warn("Duplicate user ID rejected:", userId);
-        socket.emit("error:duplicate_user", { message: "User already active in office" });
-        return;
+        const existing = users.get(userId);
+        const oldSocket = io.sockets.sockets.get(existing.socketId);
+        if (oldSocket && oldSocket.connected && oldSocket.id !== socket.id) {
+          console.warn("Duplicate active user ID rejected:", userId);
+          socket.emit("error:duplicate_user", { message: "User already active in office" });
+          return;
+        }
+        // Clean up previous timer if socket dropped
+        if (existing.trailingSaveTimer) {
+          clearTimeout(existing.trailingSaveTimer);
+        }
+        users.delete(userId);
       }
+
+      const bounds = getOfficeBounds(officeId);
+      const posX = Number.isFinite(x) ? Math.max(bounds.minX, Math.min(bounds.maxX, x)) : 100;
+      const posY = Number.isFinite(y) ? Math.max(bounds.minY, Math.min(bounds.maxY, y)) : 100;
 
       socket.data.userId = userId;
       socket.data.officeId = officeId;
@@ -47,15 +146,17 @@ function registerSocketHandlers(io) {
 
       socket.emit("presence:update", existingUsers);
 
-      const posX = Number.isFinite(x) ? Math.max(0, Math.min(800, x)) : 100;
-      const posY = Number.isFinite(y) ? Math.max(0, Math.min(500, y)) : 100;
-
       const user = {
         userId,
         officeId,
+        socketId: socket.id,
         x: posX,
         y: posY,
-        lastDbSave: 0 // allow immediate first move save
+        lastDbSave: 0,
+        isSaving: false,
+        pendingCoords: null,
+        pendingDisconnect: false,
+        trailingSaveTimer: null
       };
 
       users.set(userId, user);
@@ -63,17 +164,21 @@ function registerSocketHandlers(io) {
       // Notify other users in this office
       socket.to(officeId).emit("presence:update", [user]);
 
-      // Persistence: Upsert Presence in MongoDB asynchronously
+      // Persistence: Upsert Presence in MongoDB Atlas asynchronously
       if (mongoose.connection.readyState === 1) {
         Presence.findOneAndUpdate(
           { userId, officeId },
-          { userId, officeId, x: posX, y: posY, isOnline: true, lastSeen: new Date() },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        ).then(() => {
-          console.log(`[MongoDB] Presence saved for ${userId} in ${officeId} at (${posX}, ${posY})`);
-        }).catch((err) => {
-          console.error("[MongoDB] Join persistence error:", err.message);
-        });
+          { $set: { userId, officeId, x: posX, y: posY, isOnline: true, lastSeen: new Date() } },
+          { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+        )
+          .then((doc) => {
+            if (doc) {
+              console.log(`[MongoDB] Presence saved for ${userId} in ${officeId} at (${posX}, ${posY})`);
+            }
+          })
+          .catch((err) => {
+            console.error("[MongoDB] Join persistence error:", err.message);
+          });
       }
     });
 
@@ -95,32 +200,34 @@ function registerSocketHandlers(io) {
         return;
       }
 
+      const bounds = getOfficeBounds(officeId);
       if (
         typeof x !== "number" ||
         typeof y !== "number" ||
         !Number.isFinite(x) ||
         !Number.isFinite(y) ||
-        x < 0 || x > 800 ||
-        y < 0 || y > 500
+        x < bounds.minX || x > bounds.maxX ||
+        y < bounds.minY || y > bounds.maxY
       ) {
         console.warn("Invalid movement coordinates:", socket.id, { x, y });
         socket.emit("error:invalid_coordinates", {
-          message: "Rejected: Coordinates must be numbers with 0 <= x <= 800 and 0 <= y <= 500",
+          message: `Rejected: Coordinates must be numbers with ${bounds.minX} <= x <= ${bounds.maxX} and ${bounds.minY} <= y <= ${bounds.maxY}`,
           received: { x, y }
         });
         return;
       }
 
-      const existingUser = users.get(userId);
-      if (!existingUser || existingUser.officeId !== officeId) {
+      const user = users.get(userId);
+      if (!user || user.officeId !== officeId) {
         console.warn("Unknown active user:", socket.id);
         return;
       }
 
       // In-memory update for instant 60fps real-time broadcast
-      existingUser.x = x;
-      existingUser.y = y;
+      user.x = x;
+      user.y = y;
 
+      // Broadcast to other clients in the same office
       socket.to(officeId).emit("presence:update", [{
         userId,
         officeId,
@@ -128,19 +235,8 @@ function registerSocketHandlers(io) {
         y
       }]);
 
-      // Save position updates to MongoDB Atlas (throttled to at most once every 500ms per user)
-      const now = Date.now();
-      if (now - (existingUser.lastDbSave || 0) >= 500 && mongoose.connection.readyState === 1) {
-        existingUser.lastDbSave = now;
-        Presence.findOneAndUpdate(
-          { userId, officeId },
-          { x, y, lastSeen: new Date() }
-        ).then(() => {
-          console.log(`[MongoDB] Position updated in Atlas: ${userId} -> (${Math.round(x)}, ${Math.round(y)})`);
-        }).catch((err) => {
-          console.error("[MongoDB] Movement persistence error:", err.message);
-        });
-      }
+      // Schedule write with non-overlapping queue and trailing debounce
+      schedulePersistence(user);
     });
 
     socket.on("disconnect", () => {
@@ -150,20 +246,23 @@ function registerSocketHandlers(io) {
         const user = users.get(userId);
 
         if (user && user.officeId === officeId) {
-          users.delete(userId);
+          // Clear any pending trailing save timer
+          if (user.trailingSaveTimer) {
+            clearTimeout(user.trailingSaveTimer);
+            user.trailingSaveTimer = null;
+          }
 
+          users.delete(userId);
           socket.to(officeId).emit("user:left", { userId });
 
           // Persistence: Mark offline and persist final coordinates in MongoDB Atlas
           if (mongoose.connection.readyState === 1) {
-            Presence.findOneAndUpdate(
-              { userId, officeId },
-              { isOnline: false, lastSeen: new Date(), x: user.x, y: user.y }
-            ).then(() => {
-              console.log(`[MongoDB] Disconnect recorded for ${userId} (offline, final pos: ${Math.round(user.x)}, ${Math.round(user.y)})`);
-            }).catch((err) => {
-              console.error("[MongoDB] Disconnect persistence error:", err.message);
-            });
+            if (user.isSaving) {
+              // Wait for in-flight write to complete, then save offline
+              user.pendingDisconnect = true;
+            } else {
+              executeDbSave(user, user.x, user.y, false);
+            }
           }
         }
       }

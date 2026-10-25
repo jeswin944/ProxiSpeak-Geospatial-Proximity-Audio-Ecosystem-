@@ -13,14 +13,52 @@
 
 ---
 
-## 👥 Team Responsibilities & Day 1 Deliverables
+## 👥 Week 1 Deliverables & Team Responsibilities
 
-| Member | Focus Area | Responsibilities & Status |
+| Week | Backend (Node.js, Express, Socket.io, MongoDB) | Frontend (React, WebRTC, Canvas API) |
 | :--- | :--- | :--- |
-| **Member 1** | **Backend & Signaling** | Node.js / Express server, WebRTC signaling, WebSocket presence coordination. |
-| **Member 2** | **Frontend & Canvas** | Interactive HTML5 Canvas (800 × 500), avatar movement, obstacle rendering. |
-| **Member 3** | **Spatial Audio Engine** | Web Audio API integration, distance-decay volume curve, spatial audio zones. |
-| **Member 4** | **Database & Schemas** | **[Complete]** MongoDB Atlas setup, Mongoose schemas (`Presence`, `Office`, `User`), connection plan, automated test suite. |
+| **Week 1** | **Signaling & Movement:** Build WebSocket server to broadcast avatar X/Y coordinates. Setup basic MongoDB geospatial schemas. | **World Rendering:** Build the React Canvas layer. Implement smooth keyboard/mouse avatar movement and coordinate broadcasting. |
+
+### 📋 Detailed Member Breakdown (Week 1 Tasks Completed)
+
+#### 🔹 Member 1 — Node.js + Socket.io Server
+* **Tasks Completed:**
+  * Created the Node.js and Express backend server (`backend/src/server.js`).
+  * Set up Socket.io for real-time bi-directional communication.
+  * Handled client connections and clean disconnections (`user:join`, `disconnect`, `user:left`).
+  * Received avatar coordinates from clients with server-side validation.
+  * Broadcast movement coordinates to other connected users in the same office room.
+* **Output:** A working, low-latency real-time signaling server.
+
+#### 🔹 Member 2 — React Canvas & Virtual Office
+* **Tasks Completed:**
+  * Created the React frontend application (`frontend/`).
+  * Drew a 2D office map ($800 \times 500$ units) using the real HTML5 Canvas API (`getContext("2d")`).
+  * Rendered architectural grids, meeting pods, dev clusters, audio lounges, and boundary walls.
+  * Displayed avatar representations at any supplied X/Y coordinate with specular reflections and drop shadows.
+  * Prepared multi-avatar rendering from the synchronized presence state.
+* **Output:** A working high-DPI virtual office canvas interface.
+
+#### 🔹 Member 3 — Avatar Movement & Coordinate Broadcasting
+* **Tasks Completed:**
+  * Implemented keyboard movement using WASD and Arrow keys with normalized diagonal vectors.
+  * Added mouse pointer click-to-move and continuous click-and-drag navigation.
+  * Kept track of avatar X/Y coordinates with boundary clamping ($0 \le x \le 800$, $0 \le y \le 500$).
+  * Implemented smooth delta-time movement animation loop.
+  * Connected the React client to Member 1's Socket.io server.
+  * Sent updated coordinates via `avatar:move` and received peer coordinates via `presence:update`.
+* **Output:** Avatars that move smoothly and synchronize between multiple browsers in real time.
+
+#### 🔹 Member 4 — MongoDB Schemas & Integration Testing
+* **Tasks Completed:**
+  * Set up the MongoDB Atlas connection with secure environment variable loading.
+  * Designed basic schemas for user positions (`Presence`) and office layouts (`Office`, `User`).
+  * Stored user IDs, office IDs, and X/Y coordinates with compound unique indexing `{ officeId: 1, userId: 1 }`.
+  * Implemented atomic non-overlapping write throttling ($500\,\text{ms}$) with guaranteed trailing stop flush.
+  * Validated coordinate data and enforced server-side authorization.
+  * Built automated integration test suites verifying multi-client sync, room isolation, and live Atlas persistence.
+  * Tested the server and frontend integration with two browsers.
+* **Output:** Reliable MongoDB Atlas coordinate persistence, comprehensive test suites, and documentation.
 
 ---
 
@@ -129,37 +167,22 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.w15le4t.mongodb.net/pro
 
 > **Security Note:** Never commit `.env` files containing live credentials. Both `database/` and `backend/` have `.gitignore` configured.
 
-### 3. Run Verification Tests
-Test connectivity, document insertion, boundary validation, and cleanup:
+### 3. Run Verification Tests & Scripts
+
+Execute the comprehensive test suites from the root directory or individual modules:
 
 ```bash
-cd database
-npm run test-db
-```
+# Run live MongoDB Atlas movement persistence test (20 steps)
+npm run test:live
 
-Expected output:
-```text
-==================================================
-   ProxiSpeak Database Connection & Schema Test   
-==================================================
-[MongoDB] Connecting to MongoDB...
-[MongoDB] Connected successfully to host: ...
-[MongoDB] Active database: proxispeak
-✅ Step 1: MongoDB is reachable and connected!
-📝 Step 2: Inserting sample Presence document...
-✅ Document successfully inserted!
-🔍 Step 3: Querying the document back from MongoDB...
-✅ Document successfully retrieved:
-🧹 Step 4: Cleaning up test document...
-✅ Cleanup complete.
-🎉 ALL CHECKS PASSED: Database connection and Presence schema are fully operational!
-==================================================
+# Run multi-client Socket.IO integration tests (9 scenarios)
+npm run test:integration
+
+# Run schema boundary & database validation test
+npm run test:db
+
+# Build frontend production bundle
+npm run build:frontend
 ```
 
 ---
-
-## 📑 Next Steps (Day 2 Deliverables)
-1. **Member 1 (Backend)**: Wire Socket.io position events directly to `Presence.updateOne()` with upsert enabled.
-2. **Member 2 (Frontend)**: Connect Canvas avatar coordinate listeners (`mousemove`/`wasd`) to backend socket emitters.
-3. **Member 3 (Spatial Audio)**: Consume coordinate streams to calculate euclidean distance $d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$ for Web Audio gain control.
-4. **Member 4 (Database)**: Implement seed layouts for `Office` with collision walls and meeting zones.

@@ -25,24 +25,19 @@ app.get("/", (req, res) => {
   res.send("ProxiSpeak backend is running");
 });
 
-io.on("connection", (socket) => {
-  console.log("Connected:", socket.id);
-
-  socket.on("disconnect", () => {
-    console.log("Disconnected:", socket.id);
-  });
-});
-
 const PORT = process.env.PORT || 3000;
 
-// Connect to MongoDB before starting the HTTP server
+// Initialize MongoDB Atlas connection, then launch HTTP & Socket.IO server
 connectDB()
   .then(() => {
+    console.log("[MongoDB] Database connection verified.");
+  })
+  .catch((error) => {
+    console.error("[MongoDB] Connection warning:", error.message);
+    console.warn("[MongoDB] Operating in in-memory mode for real-time signaling.");
+  })
+  .finally(() => {
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
-  })
-  .catch((error) => {
-    console.error("Database connection failed:", error.message);
-    process.exit(1);
   });
