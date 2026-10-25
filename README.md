@@ -137,7 +137,6 @@ ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem/
 │   ├── .env.example            # Database environment template
 │   └── .gitignore              # Protects live credentials
 ├── frontend/                   # Canvas UI & avatar navigation (Member 2)
-├── docs/                       # Architectural specs & agreements
 └── README.md                   # Main ecosystem documentation
 ```
 
