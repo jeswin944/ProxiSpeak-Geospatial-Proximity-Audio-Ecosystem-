@@ -1,4 +1,15 @@
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Search for .env in database/, backend/, or workspace root
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+if (!process.env.MONGODB_URI) {
+  dotenv.config({ path: path.resolve(__dirname, '../../backend/.env') });
+}
+if (!process.env.MONGODB_URI) {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+}
+
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const TelemetryEvent = require('./models/TelemetryEvent');

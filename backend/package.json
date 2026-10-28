@@ -6,14 +6,15 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node src/test-compiler.js && node src/test-nodes.js && node src/test-serialization.js",
-    "test-all": "node src/test-compiler.js && node src/test-nodes.js && node src/test-serialization.js && node src/test-db.js && node src/test-integration.js",
+    "test": "node src/test-compiler.js && node src/test-nodes.js && node src/test-serialization.js && node src/test-api-integration.js",
+    "test-all": "node src/test-compiler.js && node src/test-nodes.js && node src/test-serialization.js && node src/test-api-integration.js && node src/test-db.js && node src/test-integration.js",
     "test-db": "node src/test-db.js",
     "test-integration": "node src/test-integration.js",
     "test-live": "node src/test-live-movement.js",
     "test-compiler": "node src/test-compiler.js",
     "test-nodes": "node src/test-nodes.js",
     "test-serialization": "node src/test-serialization.js",
+    "test-api": "node src/test-api-integration.js",
     "benchmark-ingestion": "node src/benchmark-ingestion.js"
   },
   "keywords": [],

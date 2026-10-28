@@ -239,6 +239,59 @@ function registerSocketHandlers(io) {
       schedulePersistence(user);
     });
 
+    // ─── WebRTC Signaling Relay ─────────────────────────────────────────
+    // The server acts as a pure relay — no SDP or ICE data is inspected.
+    // Each message is forwarded to the target user's active socket.
+
+    socket.on("webrtc:offer", (data) => {
+      const { targetUserId, offer } = data || {};
+      const fromUserId = socket.data.userId;
+
+      if (!fromUserId || !targetUserId || !offer) return;
+
+      const target = users.get(targetUserId);
+      if (!target) return;
+
+      const targetSocket = io.sockets.sockets.get(target.socketId);
+      if (targetSocket && targetSocket.connected) {
+        targetSocket.emit("webrtc:offer", { fromUserId, offer });
+        console.log(`[WebRTC] Offer relayed: ${fromUserId} → ${targetUserId}`);
+      }
+    });
+
+    socket.on("webrtc:answer", (data) => {
+      const { targetUserId, answer } = data || {};
+      const fromUserId = socket.data.userId;
+
+      if (!fromUserId || !targetUserId || !answer) return;
+
+      const target = users.get(targetUserId);
+      if (!target) return;
+
+      const targetSocket = io.sockets.sockets.get(target.socketId);
+      if (targetSocket && targetSocket.connected) {
+        targetSocket.emit("webrtc:answer", { fromUserId, answer });
+        console.log(`[WebRTC] Answer relayed: ${fromUserId} → ${targetUserId}`);
+      }
+    });
+
+    socket.on("webrtc:ice-candidate", (data) => {
+      const { targetUserId, candidate } = data || {};
+      const fromUserId = socket.data.userId;
+
+      if (!fromUserId || !targetUserId || !candidate) return;
+
+      const target = users.get(targetUserId);
+      if (!target) return;
+
+      const targetSocket = io.sockets.sockets.get(target.socketId);
+      if (targetSocket && targetSocket.connected) {
+        targetSocket.emit("webrtc:ice-candidate", { fromUserId, candidate });
+      }
+    });
+
+    // ─── End WebRTC Signaling Relay ─────────────────────────────────────
+
     socket.on("disconnect", () => {
       const { userId, officeId } = socket.data || {};
 
