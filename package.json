@@ -13,10 +13,12 @@
     "test:compiler": "npm --prefix backend run test-compiler",
     "test:nodes": "npm --prefix backend run test-nodes",
     "test:serialization": "npm --prefix backend run test-serialization",
+    "test:api": "npm --prefix backend run test-api",
     "test:db": "npm --prefix backend run test-db",
     "test:integration": "npm --prefix backend run test-integration",
     "test:live": "npm --prefix backend run test-live",
-    "benchmark:ingestion": "npm --prefix backend run benchmark-ingestion"
+    "benchmark:ingestion": "npm --prefix database run benchmark",
+    "test:spatial": "node frontend/src/tests/test-spatialAudio.js"
   },
   "keywords": [
     "proxispeak",
