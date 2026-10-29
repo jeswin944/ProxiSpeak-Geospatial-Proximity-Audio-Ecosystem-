@@ -68,23 +68,58 @@ export default function RealtimeAvatarDemo() {
   const audioManagerRef = useRef(audioManager);
   audioManagerRef.current = audioManager;
 
+  // Cache to avoid unnecessary volume updates when positions haven't changed (Step 3)
+  const lastVolumeUpdateRef = useRef(new Map()); // Map<userId, { localX, localY, remoteX, remoteY, distance, volume }>
+
+  // Member 3's volume update function wrapper (Step 2)
+  const updateRemoteVolume = useCallback((remoteUserId, volume) => {
+    audioManagerRef.current.updateRemoteVolume(remoteUserId, volume);
+  }, []);
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // Phase 5 — Update gain whenever local or remote positions change
+  // Phase 5 — Dynamic distance attenuation (Member 4)
   // ═══════════════════════════════════════════════════════════════════════════
   const updateAllGains = useCallback((localPos, currentUsers) => {
-    const mgr = audioManagerRef.current;
     const debugSnapshot = {};
+    const lastUpdates = lastVolumeUpdateRef.current;
 
     currentUsers.forEach((remoteUser) => {
       if (remoteUser.userId === userId) return; // skip self
 
-      const distance = calculateDistance(localPos, remoteUser);
-      const volume = calculateVolume(distance, MAX_AUDIO_DISTANCE);
+      const prev = lastUpdates.get(remoteUser.userId);
+      const isUnchanged =
+        prev &&
+        prev.localX === localPos.x &&
+        prev.localY === localPos.y &&
+        prev.remoteX === remoteUser.x &&
+        prev.remoteY === remoteUser.y;
 
-      // Apply gain — no-op if no audio pipeline exists for this user yet
-      mgr.setGain(remoteUser.userId, volume);
+      let distance;
+      let volume;
 
-      const entry = mgr.getAudioEntry(remoteUser.userId);
+      if (isUnchanged) {
+        // Step 3: Avoid unnecessary updates when coordinates are unchanged
+        distance = prev.distance;
+        volume = prev.volume;
+      } else {
+        // Step 2: Get positions, compute pixel distance and dynamic attenuation
+        distance = calculateDistance(localPos, remoteUser);
+        volume = calculateVolume(distance, MAX_AUDIO_DISTANCE);
+
+        // Step 2 & 3: Pass volume to Member 3's updateRemoteVolume with smooth setTargetAtTime
+        updateRemoteVolume(remoteUser.userId, volume);
+
+        lastUpdates.set(remoteUser.userId, {
+          localX: localPos.x,
+          localY: localPos.y,
+          remoteX: remoteUser.x,
+          remoteY: remoteUser.y,
+          distance,
+          volume,
+        });
+      }
+
+      const entry = audioManagerRef.current.getAudioEntry(remoteUser.userId);
       debugSnapshot[remoteUser.userId] = {
         distance: Math.round(distance),
         volume: parseFloat(volume.toFixed(3)),
@@ -94,7 +129,7 @@ export default function RealtimeAvatarDemo() {
     });
 
     setAudioDebug(debugSnapshot);
-  }, [userId]);
+  }, [userId, updateRemoteVolume]);
 
   // ─── Re-run gain calculation whenever position or users change ────────────
   useEffect(() => {
@@ -126,13 +161,13 @@ export default function RealtimeAvatarDemo() {
       audioManagerRef.current.connectRemoteStream(remoteUserId, stream);
       audioManagerRef.current.ensureResumed();
 
-      // Immediately apply the current distance-based gain
+      // Immediately apply the current distance-based gain (Step 2)
       const localPos = positionRef.current;
       const remoteUser = usersRef.current.find((u) => u.userId === remoteUserId);
       if (remoteUser) {
         const distance = calculateDistance(localPos, remoteUser);
         const volume = calculateVolume(distance, MAX_AUDIO_DISTANCE);
-        audioManagerRef.current.setGain(remoteUserId, volume);
+        updateRemoteVolume(remoteUserId, volume);
       }
 
       // Force debug panel refresh
@@ -291,6 +326,7 @@ export default function RealtimeAvatarDemo() {
       if (!leftUserId) return;
 
       setUsers((prev) => prev.filter((u) => u.userId !== leftUserId));
+      lastVolumeUpdateRef.current.delete(leftUserId);
       cleanupPeer(leftUserId);
     }
 

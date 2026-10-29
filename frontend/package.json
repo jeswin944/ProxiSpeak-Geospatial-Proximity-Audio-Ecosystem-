@@ -1,10 +1,10 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "description": "",
+  "description": "ProxiSpeak Virtual Office Canvas and Logic Graph Editor",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node src/tests/test-spatialAudio.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
@@ -12,7 +12,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@xyflow/react": "^12.12.0",
     "react": "^19.3.0",

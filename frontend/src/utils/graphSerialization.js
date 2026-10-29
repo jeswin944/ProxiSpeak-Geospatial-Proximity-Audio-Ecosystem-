@@ -194,3 +194,12 @@ export function deserializeGraph(rawInput) {
     edges
   };
 }
+
+// Support both CommonJS and ES Module environments
+export {
+  CURRENT_SCHEMA_VERSION,
+  serializeGraph,
+  deserializeGraph,
+  sanitizeNode,
+  sanitizeEdge
+};
