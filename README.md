@@ -69,7 +69,7 @@
 | **Logic Compiler** | Node.js, RxJS Observables, Express | Compiles saved React Flow JSON into executable RxJS pipelines; Kahn's Algorithm cycle detection (DAG enforcement); memory leak prevention. **(7/7 Tests Passed)** |
 | **Node Library** | React Flow (`@xyflow/react`), RxJS | Reusable nodes for Data Sources, Math Operations (arithmetic, comparisons, zero-division safety), and Action Triggers (rate-limited logger, event emitter, threshold alerts). **(10/10 Tests Passed)** |
 | **Graph Serialization** | JSON, React Flow Schema v1.0.0 | Versioned serialization/deserialization engine; cleans transient DOM state; preserves exact node/edge IDs, positions, and handles. Restores and executes complex branching pipelines. **(5/5 Tests Passed)** |
-| **MongoDB Ingestion Audit** | MongoDB Native Time-Series, Mongoose | High-throughput benchmark sustaining **6,238 writes/second** against live MongoDB Atlas (exceeding 5,000 writes/sec target) with ~15 bytes/doc compressed footprint. **(VERIFIED)** |
+| **MongoDB Ingestion Audit** | MongoDB Native Time-Series, Mongoose | High-throughput benchmark sustaining **6,684 writes/second** against live MongoDB Atlas (exceeding 5,000 writes/sec target) with ~15 bytes/doc compressed footprint. **(VERIFIED)** |
 
 ### 🛠️ Week 2 & Mid-Review Module Breakdown
 
@@ -92,7 +92,7 @@
 
 #### 4. High-Throughput Ingestion Benchmark (`database/src/benchmark-ingestion.js`)
 * Tested against live MongoDB Atlas cluster with 10 parallel worker streams and 500-document batches.
-* Achieved **6,238 writes/second** (10,000 / 10,000 confirmed writes in 1.60s with 0 errors).
+* Achieved **6,684 writes/second** (10,000 / 10,000 confirmed writes in 1.496s with 0 errors).
 * Leverages MongoDB native Time-Series collection (`timeseries: { timeField: "timestamp", metaField: "metadata", granularity: "seconds" }`) with 24-hour TTL.
 
 ---
@@ -205,44 +205,54 @@ ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem/
 │   │   └── utils/
 │   │       └── graphSerialization.js # Schema v1.0.0 serialization engine
 │   └── package.json            # Frontend Vite & React Flow configuration
-├── docs/                       # Specifications & Formal Audit Evidence
+├── docs/                       # Master Specifications & Formal Audit Hub
 │   ├── README.md               # Master documentation index
+│   ├── week1.md                # Week 1 Master Specification
 │   ├── week1-integration-test-report.md
+│   ├── week2.md                # Week 2 Master Specification
+│   ├── week2-completion-report.md
 │   ├── week2-logic-compiler.md
 │   ├── week2-node-library.md
+│   ├── spatial-audio-day1-report.md
 │   ├── mid-review-graph-serialization.md
 │   └── mid-review-mongodb-ingestion-audit.md
+├── run-ecosystem.js            # Monorepo concurrent runner (Backend + Frontend)
+├── vite.config.mjs             # Root Vite fallback configuration
 └── README.md                   # Main ecosystem documentation
 ```
 
 ---
 
-## 🚀 Quickstart & Database Verification
+## 🚀 Quickstart & Running the System
 
 ### 1. Prerequisites
 * [Node.js](https://nodejs.org/) (v18+ recommended)
 * [MongoDB Atlas](https://cloud.mongodb.com/) account or local MongoDB instance
 
 ### 2. Environment Configuration
-Copy the template file to `.env` inside the `database/` directory:
-
-```bash
-cd database
-cp .env.example .env
-```
-
-Ensure `MONGODB_URI` contains your connection credentials:
-
+Ensure `.env` exists in `backend/` and `database/` with valid credentials:
 ```env
 PORT=3000
+CLIENT_URL=http://localhost:5173
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.w15le4t.mongodb.net/proxispeak?retryWrites=true&w=majority
 ```
 
-> **Security Note:** Never commit `.env` files containing live credentials. Both `database/` and `backend/` have `.gitignore` configured.
+### 3. Launching the Application
 
-### 3. Run Verification Tests & Scripts
+Start both the backend server and frontend application in a single command from root:
+```bash
+npm run dev
+```
+* **Frontend Web App**: [http://localhost:5173](http://localhost:5173) (Virtual Office & Logic Graph Editor)
+* **Backend API & WebSockets**: [http://localhost:3000](http://localhost:3000)
 
-Execute the comprehensive test suites from the root directory or individual modules:
+Alternatively, start services individually:
+```bash
+npm run start:backend     # Backend Express / Socket.io server
+npm run start:frontend    # Frontend Vite dev server
+```
+
+### 4. Running Verification Test Suites
 
 ```bash
 # Run Week 2 & Mid-Review verification suites (Compiler, Nodes, Serialization)
@@ -260,8 +270,11 @@ npm run test:integration
 # Run schema boundary & database validation test
 npm run test:db
 
+# Run spatial audio distance & volume attenuation tests
+npm run test:spatial
+
 # Build frontend production bundle
 npm run build:frontend
 ```
 
----
+For complete in-depth documentation, visit the [Master Documentation Hub](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/README.md).

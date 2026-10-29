@@ -159,12 +159,10 @@ function deserializeGraph(rawInput) {
 }
 
 // Support both CommonJS and ES Module environments
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    CURRENT_SCHEMA_VERSION,
-    serializeGraph,
-    deserializeGraph,
-    sanitizeNode,
-    sanitizeEdge
-  };
-}
+export {
+  CURRENT_SCHEMA_VERSION,
+  serializeGraph,
+  deserializeGraph,
+  sanitizeNode,
+  sanitizeEdge
+};
