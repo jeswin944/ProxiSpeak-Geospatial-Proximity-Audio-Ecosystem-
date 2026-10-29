@@ -5,10 +5,6 @@
  * between avatars in the 800×500 office canvas coordinate system.
  *
  * These operate on pixel-space coordinates — no geographic conversion needed.
- *
- * Works as a dual CJS/ESM module:
- *   - Vite (frontend build): consumes via named ESM-style imports (Vite handles CJS)
- *   - Node.js tests: require('./spatialAudio')
  */
 
 /**
@@ -18,7 +14,7 @@
  * @param {{ x: number, y: number }} b - Second avatar position
  * @returns {number} Euclidean distance in coordinate units (pixels)
  */
-function calculateDistance(a, b) {
+export function calculateDistance(a, b) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
 
@@ -43,7 +39,7 @@ function calculateDistance(a, b) {
  * @param {number} maxDistance   - Maximum audible distance (default 300)
  * @returns {number} Volume gain in [0, 1]
  */
-function calculateVolume(distance, maxDistance = 300) {
+export function calculateVolume(distance, maxDistance = 300) {
   if (
     !Number.isFinite(distance) ||
     !Number.isFinite(maxDistance) ||
@@ -59,6 +55,3 @@ function calculateVolume(distance, maxDistance = 300) {
 
   return 1 - distance / maxDistance;
 }
-
-// CommonJS export (Vite also handles CJS; Node tests use require())
-module.exports = { calculateDistance, calculateVolume };

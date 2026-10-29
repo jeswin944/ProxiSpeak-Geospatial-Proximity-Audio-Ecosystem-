@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "ProxiSpeak Geospatial Proximity Audio Ecosystem - Monorepo Root",
   "scripts": {
-    "dev": "npm --prefix backend start",
-    "start": "npm --prefix backend start",
+    "dev": "node run-ecosystem.js",
+    "start": "node run-ecosystem.js",
+    "start:all": "node run-ecosystem.js",
     "start:backend": "npm --prefix backend start",
     "start:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",
@@ -18,7 +19,7 @@
     "test:integration": "npm --prefix backend run test-integration",
     "test:live": "npm --prefix backend run test-live",
     "benchmark:ingestion": "npm --prefix database run benchmark",
-    "test:spatial": "node frontend/src/tests/test-spatialAudio.js"
+    "test:spatial": "node frontend/src/tests/test-spatialAudio.mjs"
   },
   "keywords": [
     "proxispeak",
