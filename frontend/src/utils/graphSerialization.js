@@ -1,93 +1,122 @@
-/**
- * Graph Serialization & Deserialization Engine for ProxiSpeak React Flow
- *
- * Ensures:
- * - Versioned, schema-validated JSON export
- * - Complete preservation of Node IDs, types, positions, configuration data
- * - Complete preservation of Edge IDs, source/target nodes, source/target handles
- * - Clean sanitization of transient UI state, DOM references, and functions
- * - Safe deserialization with schema validation and error reporting
- */
-
-const CURRENT_SCHEMA_VERSION = '1.0.0';
+export const CURRENT_SCHEMA_VERSION = "1.0.0";
 
 /**
- * Sanitizes and extracts plain serializable node data
+ * Sanitizes and validates a React Flow node.
  */
-function sanitizeNode(node) {
-  if (!node || typeof node !== 'object') {
-    throw new Error('Invalid node: must be a non-null object');
+export function sanitizeNode(node) {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    throw new Error("Invalid node: must be a non-null object");
   }
 
   const { id, type, position = { x: 0, y: 0 }, data = {} } = node;
 
-  if (!id || typeof id !== 'string') {
-    throw new Error(`Node is missing required string "id": ${JSON.stringify(node)}`);
-  }
-  if (!type || typeof type !== 'string') {
-    throw new Error(`Node "${id}" is missing required string "type"`);
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Node must have a valid string id");
   }
 
-  // Deep clone data to avoid circular references or functions
-  let cleanData = {};
+  if (typeof type !== "string" || !type.trim()) {
+    throw new Error(`Node "${id}" must have a valid string type`);
+  }
+
+  if (
+    !position ||
+    typeof position !== "object" ||
+    !Number.isFinite(Number(position.x)) ||
+    !Number.isFinite(Number(position.y))
+  ) {
+    throw new Error(`Node "${id}" has an invalid position`);
+  }
+
+  let cleanData;
+
   try {
     cleanData = JSON.parse(JSON.stringify(data));
-  } catch (err) {
-    throw new Error(`Node "${id}" contains non-serializable configuration data: ${err.message}`);
+  } catch (error) {
+    throw new Error(
+      `Node "${id}" contains non-serializable data: ${error.message}`
+    );
   }
 
   return {
     id,
     type,
     position: {
-      x: Number(position.x) || 0,
-      y: Number(position.y) || 0
+      x: Number(position.x),
+      y: Number(position.y)
     },
     data: cleanData
   };
 }
 
 /**
- * Sanitizes and extracts plain serializable edge data
+ * Sanitizes and validates a React Flow edge.
  */
-function sanitizeEdge(edge) {
-  if (!edge || typeof edge !== 'object') {
-    throw new Error('Invalid edge: must be a non-null object');
+export function sanitizeEdge(edge) {
+  if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
+    throw new Error("Invalid edge: must be a non-null object");
   }
 
-  const { id, source, target, sourceHandle = null, targetHandle = null } = edge;
+  const {
+    id,
+    source,
+    target,
+    sourceHandle = null,
+    targetHandle = null
+  } = edge;
 
-  if (!id || typeof id !== 'string') {
-    throw new Error(`Edge is missing required string "id": ${JSON.stringify(edge)}`);
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Edge must have a valid string id");
   }
-  if (!source || typeof source !== 'string') {
-    throw new Error(`Edge "${id}" is missing required string "source"`);
+
+  if (typeof source !== "string" || !source.trim()) {
+    throw new Error(`Edge "${id}" must have a valid source`);
   }
-  if (!target || typeof target !== 'string') {
-    throw new Error(`Edge "${id}" is missing required string "target"`);
+
+  if (typeof target !== "string" || !target.trim()) {
+    throw new Error(`Edge "${id}" must have a valid target`);
   }
 
   return {
     id,
     source,
     target,
-    sourceHandle: sourceHandle ? String(sourceHandle) : null,
-    targetHandle: targetHandle ? String(targetHandle) : null
+    sourceHandle:
+      sourceHandle == null ? null : String(sourceHandle),
+    targetHandle:
+      targetHandle == null ? null : String(targetHandle),
+    ...(edge.type ? { type: edge.type } : {}),
+    ...(edge.label !== undefined ? { label: edge.label } : {}),
+    ...(edge.animated !== undefined ? { animated: edge.animated } : {}),
+    ...(edge.data !== undefined ? { data: edge.data } : {})
   };
 }
 
 /**
- * Serializes nodes, edges, and metadata into a versioned JSON object or string
+ * Serializes nodes and edges into a versioned JSON payload.
  *
  * @param {Array} nodes
  * @param {Array} edges
- * @param {object} metadata
+ * @param {Object} metadata
  * @param {boolean} asString
- * @returns {object|string}
+ * @returns {Object|string}
  */
-function serializeGraph(nodes = [], edges = [], metadata = {}, asString = false) {
-  if (!Array.isArray(nodes)) throw new Error('Nodes must be an array');
-  if (!Array.isArray(edges)) throw new Error('Edges must be an array');
+export function serializeGraph(
+  nodes = [],
+  edges = [],
+  metadata = {},
+  asString = false
+) {
+  if (!Array.isArray(nodes)) {
+    throw new Error("Nodes must be an array");
+  }
+
+  if (!Array.isArray(edges)) {
+    throw new Error("Edges must be an array");
+  }
+
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    throw new Error("Metadata must be an object");
+  }
 
   const cleanNodes = nodes.map(sanitizeNode);
   const cleanEdges = edges.map(sanitizeEdge);
@@ -95,8 +124,8 @@ function serializeGraph(nodes = [], edges = [], metadata = {}, asString = false)
   const payload = {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     id: metadata.id || `graph-${Date.now()}`,
-    name: metadata.name || 'Untitled Graph',
-    description: metadata.description || '',
+    name: metadata.name || "Untitled Graph",
+    description: metadata.description || "",
     updatedAt: new Date().toISOString(),
     nodes: cleanNodes,
     edges: cleanEdges
@@ -106,40 +135,48 @@ function serializeGraph(nodes = [], edges = [], metadata = {}, asString = false)
 }
 
 /**
- * Deserializes and validates a JSON string or object back into React Flow compatible nodes and edges
+ * Deserializes and validates a graph JSON string or object.
  *
- * @param {string|object} rawInput
- * @returns {object} { nodes, edges, metadata, schemaVersion }
+ * @param {string|Object} rawInput
+ * @returns {Object}
  */
-function deserializeGraph(rawInput) {
+export function deserializeGraph(rawInput) {
   let parsed = rawInput;
 
-  if (typeof rawInput === 'string') {
+  if (typeof rawInput === "string") {
     try {
       parsed = JSON.parse(rawInput);
-    } catch (err) {
-      throw new Error(`Malformed JSON string cannot be deserialized: ${err.message}`);
+    } catch (error) {
+      throw new Error(
+        `Malformed JSON string: ${error.message}`
+      );
     }
   }
 
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('Deserialization target must be a non-null object or JSON string');
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      "Deserialization target must be an object or JSON string"
+    );
   }
 
   if (!parsed.schemaVersion) {
     throw new Error('Missing "schemaVersion" in graph payload');
   }
 
-  const majorVersion = String(parsed.schemaVersion).split('.')[0];
-  if (majorVersion !== '1') {
-    throw new Error(`Unsupported schemaVersion "${parsed.schemaVersion}". Supported version: ^1.x`);
+  const majorVersion = String(parsed.schemaVersion).split(".")[0];
+
+  if (majorVersion !== "1") {
+    throw new Error(
+      `Unsupported schemaVersion "${parsed.schemaVersion}". Supported version: ^1.x`
+    );
   }
 
   if (!Array.isArray(parsed.nodes)) {
-    throw new Error('Missing or invalid "nodes" array in serialized graph');
+    throw new Error('Missing or invalid "nodes" array');
   }
+
   if (!Array.isArray(parsed.edges)) {
-    throw new Error('Missing or invalid "edges" array in serialized graph');
+    throw new Error('Missing or invalid "edges" array');
   }
 
   const nodes = parsed.nodes.map(sanitizeNode);

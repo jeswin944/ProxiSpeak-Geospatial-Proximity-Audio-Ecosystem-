@@ -49,7 +49,7 @@ export function calculateVolume(distance, maxDistance = 300) {
     return 0;
   }
 
-  if (distance >= maxDistance) {
+  if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
     return 0;
   }
 
