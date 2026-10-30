@@ -44,12 +44,9 @@ export function calculateVolume(distance, maxDistance = 300) {
     !Number.isFinite(distance) ||
     !Number.isFinite(maxDistance) ||
     distance < 0 ||
-    maxDistance <= 0
+    maxDistance <= 0 ||
+    distance >= maxDistance
   ) {
-    return 0;
-  }
-
-  if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
     return 0;
   }
 
