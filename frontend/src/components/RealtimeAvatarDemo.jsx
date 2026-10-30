@@ -23,7 +23,7 @@ const ICE_SERVERS = [
 
 export default function RealtimeAvatarDemo() {
   // ─── Identity ────────────────────────────────────────────────────────────
-  const [userId] = useState(() => {
+  const [userId, setUserId] = useState(() => {
     let stored = sessionStorage.getItem("proxispeak_uid");
     if (!stored) {
       stored = `user_${Math.floor(100 + Math.random() * 900)}`;
@@ -73,7 +73,13 @@ export default function RealtimeAvatarDemo() {
 
   // Member 3's volume update function wrapper (Step 2)
   const updateRemoteVolume = useCallback((remoteUserId, volume) => {
-    audioManagerRef.current.updateRemoteVolume(remoteUserId, volume);
+    if (audioManagerRef.current) {
+      if (typeof audioManagerRef.current.updateRemoteVolume === "function") {
+        audioManagerRef.current.updateRemoteVolume(remoteUserId, volume);
+      } else if (typeof audioManagerRef.current.setGain === "function") {
+        audioManagerRef.current.setGain(remoteUserId, volume);
+      }
+    }
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -296,29 +302,36 @@ export default function RealtimeAvatarDemo() {
           ? data.users
           : [];
 
-      setUsers((prevUsers) => {
-        const userMap = new Map(prevUsers.map((u) => [u.userId, u]));
-        const newRemotes = [];
+      const currentUsers = usersRef.current;
+      const userMap = new Map(currentUsers.map((u) => [u.userId, u]));
+      const newRemotes = [];
 
-        incomingUsers.forEach((u) => {
-          if (u && typeof u.userId === "string" && Number.isFinite(u.x) && Number.isFinite(u.y)) {
-            const isNew = !userMap.has(u.userId) && u.userId !== userId;
-            userMap.set(u.userId, {
-              ...userMap.get(u.userId),
-              ...u,
-              name: u.userId === userId ? "You" : u.userId,
-            });
-            if (isNew) newRemotes.push(u.userId);
+      incomingUsers.forEach((u) => {
+        if (u && typeof u.userId === "string" && Number.isFinite(u.x) && Number.isFinite(u.y)) {
+          if (!userMap.has(u.userId) && u.userId !== userId) {
+            newRemotes.push(u.userId);
           }
-        });
-
-        // Initiate WebRTC calls to newly discovered peers
-        newRemotes.forEach((remoteUserId) => {
-          initiateCall(remoteUserId);
-        });
-
-        return Array.from(userMap.values());
+          userMap.set(u.userId, {
+            ...userMap.get(u.userId),
+            ...u,
+            name: u.userId === userId ? "You" : u.userId,
+          });
+        }
       });
+
+      setUsers(Array.from(userMap.values()));
+
+      // Initiate WebRTC calls to newly discovered peers outside state updater
+      newRemotes.forEach((remoteUserId) => {
+        initiateCall(remoteUserId);
+      });
+    }
+
+    function handleDuplicateUser() {
+      console.warn("[ProxiSpeak] Duplicate user detected. Assigning fresh unique user ID...");
+      const newId = `user_${Math.floor(100 + Math.random() * 900)}`;
+      sessionStorage.setItem("proxispeak_uid", newId);
+      setUserId(newId);
     }
 
     function handleUserLeft(data) {
@@ -374,8 +387,13 @@ export default function RealtimeAvatarDemo() {
     socket.on("webrtc:offer", handleWebRtcOffer);
     socket.on("webrtc:answer", handleWebRtcAnswer);
     socket.on("webrtc:ice-candidate", handleIceCandidate);
+    socket.on("error:duplicate_user", handleDuplicateUser);
 
-    socket.connect();
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      socket.connect();
+    }
 
     return () => {
       socket.off("connect", handleConnect);
@@ -385,6 +403,7 @@ export default function RealtimeAvatarDemo() {
       socket.off("webrtc:offer", handleWebRtcOffer);
       socket.off("webrtc:answer", handleWebRtcAnswer);
       socket.off("webrtc:ice-candidate", handleIceCandidate);
+      socket.off("error:duplicate_user", handleDuplicateUser);
       socket.disconnect();
     };
   }, [userId, officeId, createPeerConnection, cleanupPeer, initiateCall]);

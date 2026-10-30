@@ -1,88 +1,65 @@
 # ProxiSpeak — Master Documentation Hub
 
-Welcome to the central documentation and engineering audit directory for the **ProxiSpeak Geospatial Proximity Audio Ecosystem**. This index organizes system specifications, architectural diagrams, API contracts, and formal verification reports across all milestones.
+Welcome to the central documentation directory for the **ProxiSpeak Geospatial Proximity Audio Ecosystem**. This index organizes the architectural specifications, system designs, and verification results.
 
 ---
 
-## 🚀 Quickstart & How to Run
+## 🚀 Quickstart & Commands
 
-### Run the Full Ecosystem (Backend + Frontend)
-Launch both the Express/Socket.IO backend and the React/Vite frontend concurrently:
+### Run Full Ecosystem (Backend + Frontend)
 ```bash
 npm run dev
 # OR: node run-ecosystem.js
 ```
-* **Virtual Office & Graph Editor**: [http://localhost:5173](http://localhost:5173)
-* **Backend Signaling & API**: [http://localhost:3000](http://localhost:3000)
+- **Virtual Office & Logic Graph Editor**: [http://localhost:5173](http://localhost:5173)
+- **Backend API & Socket.IO**: [http://localhost:3000](http://localhost:3000)
 
 ### Run Individual Services
-* Backend only: `npm run start:backend`
-* Frontend only: `npm run start:frontend`
+- **Backend Server**: `npm run start:backend`
+- **Frontend App**: `npm run start:frontend`
 
 ### Run Verification Test Suites
 | Milestone / Module | Command | Description |
 |---|---|---|
-| **All Test Suites** | `npm run test:all` | Sequentially executes all verification suites. |
+| **All Backend Tests** | `npm run test:all` | Sequentially executes all verification test suites. |
+| **Week 1 Multi-Client Integration** | `npm run test:integration` | 9-scenario Socket.IO room isolation & movement tests. |
+| **Week 1 MongoDB Atlas Persistence** | `npm run test:db` | Schema boundary constraints and live Atlas CRUD. |
+| **Week 1 Spatial Audio Math** | `npm run test:spatial` | 19-case Euclidean distance and gain attenuation tests. |
 | **Week 2 Logic Compiler** | `npm run test:compiler` | Kahn's algorithm cycle detection & RxJS pipeline execution. |
 | **Week 2 Node Library** | `npm run test:nodes` | Data sources, zero-division math guards, and action triggers. |
-| **Mid-Review Serialization** | `npm run test:serialization` | Schema v1.0.0 JSON serialization round-trips. |
-| **REST API Integration** | `npm run test:api` | End-to-end graph compilation and execution endpoints. |
-| **Socket.IO Integration** | `npm run test:integration` | Multi-client real-time movement and room isolation. |
-| **MongoDB Atlas Persistence** | `npm run test:db` | Schema boundary constraints and live Atlas CRUD. |
-| **Spatial Audio Math** | `npm run test:spatial` | Distance attenuation and stereo panning math. |
-| **Ingestion Benchmark** | `npm run benchmark:ingestion` | 5,000+ writes/sec MongoDB Time-Series ingestion benchmark. |
+| **Week 2 Graph Serialization** | `npm run test:serialization` | Schema v1.0.0 JSON serialization round-trips. |
+| **Week 2 REST API Integration** | `npm run test:api` | End-to-end graph compilation and execution endpoints. |
+| **Time-Series Ingestion Benchmark** | `npm run benchmark:ingestion` | 5,000+ writes/sec MongoDB Time-Series ingestion benchmark. |
 
 ---
 
-## 📑 Week 1 Documentation & Deliverables
+## 📑 Milestone Documentation
 
-* **[Week 1 Master Specification](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/week1.md)**:
-  - System architecture for 2D Canvas and real-time Socket.IO movement signaling.
-  - Team member roles and breakdown.
-  - Spatial audio Euclidean distance attenuation and stereo panning models.
-  - MongoDB Atlas `Presence` schema and 500ms write throttling with non-overlapping locks.
-* **[Week 1 Integration Test Report](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/week1-integration-test-report.md)**:
-  - 9 multi-client Socket.IO integration scenarios (room isolation, coordinate bounds, reconnect deduplication).
-  - 20-step live MongoDB Atlas movement persistence audit.
-* **[Spatial Audio Day 1 Report](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/spatial-audio-day1-report.md)**:
-  - Web Audio API integration and unit test evidence (19/19 passed).
+### 🏢 [Week 1 — Geospatial Office & Spatial Audio Specification](./week1.md)
+Detailed specification and verification evidence for Week 1:
+- **Real-Time Signaling:** Express + Socket.IO server, room isolation (`officeId`), identity protection, and disconnect handling.
+- **Office Canvas Engine:** HTML5 2D Retina-scaled canvas ($800 \times 500$), architectural zones, and 150px proximity preview.
+- **Spatial Audio & WebRTC:** Euclidean distance model, linear attenuation, Web Audio GainNodes, and mesh WebRTC audio streaming.
+- **MongoDB Atlas Persistence:** Compound index `{ officeId: 1, userId: 1 }`, 500ms throttled writes with non-overlapping locks, and trailing stop flush.
+- **Verification Evidence:** 9/9 Socket.IO integration tests, 6/6 MongoDB Atlas CRUD tests, and 19/19 spatial audio tests passed.
 
 ---
 
-## ⚡ Week 2 Documentation & Deliverables
-
-* **[Week 2 Master Specification](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/week2.md)**:
-  - Architecture of the Logic Compiler compiling React Flow JSON to RxJS Observables.
-  - Kahn's algorithm cycle detection (DAG enforcement).
-  - Memory leak prevention and complete stream teardown hooks.
-* **[Week 2 Logic Compiler Specification](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/week2-logic-compiler.md)**:
-  - Deep dive into graph validation, topological sorting, and pure functional RxJS synthesis.
-  - Automated test suite results (7/7 passed).
-* **[Week 2 Node Library Specification](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/week2-node-library.md)**:
-  - Custom node definitions: Data Sources, Math Operations, Action Triggers.
-  - Automated test suite results (10/10 passed).
-* **[Week 2 Completion Report](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/week2-completion-report.md)**:
-  - Formal audit evidence, cross-platform build verification, and benchmark wiring.
-
----
-
-## 📊 Mid-Project Review & Ingestion Audits
-
-* **[Mid-Project Review: Graph Serialization Audit](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/mid-review-graph-serialization.md)**:
-  - Schema v1.0.0 versioned serialization engine.
-  - Elimination of transient DOM state and preservation of port IDs and coordinates.
-  - Restored complex branching execution evidence (5/5 passed).
-* **[Mid-Project Review: MongoDB Ingestion Audit & Benchmark](file:///c:/Users/User/OneDrive/Desktop/ProxiSpeak-Geospatial-Proximity-Audio-Ecosystem-/docs/mid-review-mongodb-ingestion-audit.md)**:
-  - High-throughput Time-Series benchmark results: **6,684 writes/second** achieved against live MongoDB Atlas.
-  - Storage footprint analysis: **~15 bytes per document** average.
+### ⚡ [Week 2 — Logic Compiler & Reactive Architecture Specification](./week2.md)
+Detailed specification and verification evidence for Week 2 & Mid-Project Review:
+- **Visual Logic Graph Editor:** React Flow node-based interface for constructing event and dataflow pipelines.
+- **Sandboxed Logic Compiler:** Kahn's topological sort algorithm for DAG enforcement, structural validation, and pure functional RxJS Observables synthesis (zero `eval()`).
+- **Standard Node Library:** Data Sources (static, interval, manual, mock telemetry), Safe Math Operators (with division-by-zero guards), and Action Triggers.
+- **Graph Serialization Engine:** Schema `v1.0.0` lossless serialization, transient UI state stripping, and branch execution.
+- **High-Throughput Time-Series Ingestion:** Native MongoDB Time-Series collection sustaining **6,684 writes/second** with compressed per-document storage (~15 bytes).
+- **Verification Evidence:** 7/7 compiler tests, 10/10 node tests, 5/5 serialization tests, and 4/4 REST API tests passed.
 
 ---
 
 ## 🗄️ Database Schemas & Models
 
 1. **`Presence`** (`backend/src/models/Presence.js`):
-   - Real-time avatar coordinates inside office spaces.
-   - Bounded to canvas dimensions ($0 \le x \le 800$, $0 \le y \le 500$).
+   - Real-time avatar coordinates inside office spaces ($0 \le x \le 800$, $0 \le y \le 500$).
    - Compound unique index: `{ officeId: 1, userId: 1 }`.
 2. **`Office`** (`backend/src/models/Office.js`):
    - Office layout geometry, meeting pods, dev clusters, and obstacle barriers.

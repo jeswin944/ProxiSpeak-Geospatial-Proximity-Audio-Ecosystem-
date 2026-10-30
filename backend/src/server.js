@@ -2,8 +2,10 @@ const dns = require("dns");
 
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
+// Load backend-specific environment variables from backend/.env.
+// This must run before any module that reads process.env.
 require("dotenv").config({
-  path: require("path").resolve(__dirname, "../../.env"),
+  path: require("path").resolve(__dirname, "../.env"),
 });
 
 const express = require("express");

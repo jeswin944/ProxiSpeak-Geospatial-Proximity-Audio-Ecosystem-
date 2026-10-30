@@ -23,6 +23,7 @@
  *
  *   // When positions change:
  *   audioManager.setGain(remoteUserId, volume);        // 0.0 – 1.0
+ *   audioManager.updateRemoteVolume(remoteUserId, volume);
  *
  *   // After a user gesture:
  *   audioManager.ensureResumed();
@@ -187,6 +188,7 @@ export function createSpatialAudioManager() {
     ensureResumed,
     connectRemoteStream,
     setGain,
+    updateRemoteVolume: setGain,
     getAudioEntry,
     getConnectedUsers,
     disconnectUser,
@@ -197,5 +199,3 @@ export function createSpatialAudioManager() {
     },
   };
 }
-
-
